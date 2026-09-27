@@ -1,0 +1,283 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antarctic Operations Dock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <style>
+    :root {
+      --mist-gray: #E0E5E9;
+      --deep-teal: #004E64;
+    }
+
+    body {
+      background-color: #0f172a;
+      background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+
+    .glass-dock {
+      background: rgba(224, 229, 233, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 78, 100, 0.2);
+      box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5), 0 4px 10px -4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .dock-item {
+      transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .dock-item:hover {
+      transform: translateY(-4px) scale(1.12);
+      background-color: rgba(0, 78, 100, 0.08);
+      box-shadow: 0 4px 12px rgba(0, 78, 100, 0.15);
+    }
+
+    .dock-item.active {
+      background-color: var(--deep-teal);
+      color: white;
+      transform: scale(1.05);
+      box-shadow: 0 6px 16px rgba(0, 78, 100, 0.4);
+    }
+
+    .dock-item.active iconify-icon {
+      color: white;
+    }
+
+    .dock-item:not(.active) iconify-icon {
+      color: var(--deep-teal);
+    }
+
+    .tooltip {
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px) translateX(-50%);
+      transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+
+    .dock-item:hover .tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(-4px) translateX(-50%);
+    }
+
+    .active-indicator {
+      opacity: 0;
+      transform: scaleX(0);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .dock-item.active .active-indicator {
+      opacity: 1;
+      transform: scaleX(1);
+    }
+
+    @keyframes pulse-dot {
+      0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+      }
+
+      70% {
+        box-shadow: 0 0 0 4px rgba(34, 197, 94, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+      }
+    }
+
+    .status-dot {
+      animation: pulse-dot 2s infinite;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex items-start justify-center pt-12 relative">
+
+  <!-- Mock Dashboard Background Elements -->
+  <div class="absolute inset-0 z-0 pointer-events-none opacity-20" data-sd-id="1">
+    <div class="absolute top-32 left-10 w-64 h-64 border border-slate-700 rounded-lg" data-sd-id="2"></div>
+    <div class="absolute top-32 right-10 w-96 h-48 border border-slate-700 rounded-lg" data-sd-id="3"></div>
+    <div class="absolute top-96 left-10 w-[60%] h-80 border border-slate-700 rounded-lg" data-sd-id="4"></div>
+    <div class="absolute bottom-10 left-1/2 -translate-x-1/2 text-slate-600 font-mono text-xs tracking-widest"
+      data-sd-id="5">ANTARCTIC DIGITAL TWIN // SYSTEM TERMINAL ACTIVE</div>
+  </div>
+
+  <!-- Operations Dock -->
+  <nav class="glass-dock rounded-full h-[72px] px-6 flex items-center justify-between gap-8 z-10 w-auto max-w-[1200px]"
+    data-sd-id="6">
+
+    <!-- Left: System Status -->
+    <div class="flex items-center gap-3 pl-2 pr-6 border-r border-[#004E64]/20 h-8" data-sd-id="7">
+      <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 status-dot" data-sd-id="8"></div>
+      <span class="text-xs font-semibold tracking-wider text-[#004E64] uppercase" data-sd-id="9">SYSTEM ONLINE</span>
+    </div>
+
+    <!-- Center: Navigation Items -->
+    <div class="flex items-center gap-2" data-sd-id="10">
+
+      <!-- OVERVIEW (Active) -->
+      <button
+        class="dock-item active relative w-12 h-12 rounded-full flex items-center justify-center cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#004E64] focus:ring-offset-2 focus:ring-offset-[#E0E5E9]"
+        data-sd-id="11">
+        <iconify-icon icon="lucide:radar" class="text-[22px]"></iconify-icon>
+        <div
+          class="tooltip absolute -top-10 left-1/2 bg-[#004E64] text-white text-[11px] font-medium px-3 py-1.5 rounded-md whitespace-nowrap shadow-lg"
+          data-sd-id="12">
+          Overview
+          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#004E64] rotate-45" data-sd-id="13">
+          </div>
+        </div>
+        <div class="active-indicator absolute -bottom-2 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#004E64]"
+          data-sd-id="14"></div>
+      </button>
+
+      <!-- STATIONS -->
+      <button
+        class="dock-item relative w-12 h-12 rounded-full flex items-center justify-center cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#004E64] focus:ring-offset-2 focus:ring-offset-[#E0E5E9]"
+        data-sd-id="15">
+        <iconify-icon icon="lucide:mountain-snow" class="text-[22px]"></iconify-icon>
+        <div
+          class="tooltip absolute -top-10 left-1/2 bg-[#004E64] text-white text-[11px] font-medium px-3 py-1.5 rounded-md whitespace-nowrap shadow-lg"
+          data-sd-id="16">
+          Stations
+          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#004E64] rotate-45" data-sd-id="17">
+          </div>
+        </div>
+      </button>
+
+      <!-- DIGITAL TWIN -->
+      <button
+        class="dock-item relative w-12 h-12 rounded-full flex items-center justify-center cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#004E64] focus:ring-offset-2 focus:ring-offset-[#E0E5E9]"
+        data-sd-id="18">
+        <iconify-icon icon="lucide:box" class="text-[22px]"></iconify-icon>
+        <div
+          class="tooltip absolute -top-10 left-1/2 bg-[#004E64] text-white text-[11px] font-medium px-3 py-1.5 rounded-md whitespace-nowrap shadow-lg"
+          data-sd-id="19">
+          Digital Twin
+          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#004E64] rotate-45" data-sd-id="20">
+          </div>
+        </div>
+      </button>
+
+      <!-- MACHINERY -->
+      <button
+        class="dock-item relative w-12 h-12 rounded-full flex items-center justify-center cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#004E64] focus:ring-offset-2 focus:ring-offset-[#E0E5E9]"
+        data-sd-id="21">
+        <iconify-icon icon="lucide:cog" class="text-[22px]"></iconify-icon>
+        <div
+          class="tooltip absolute -top-10 left-1/2 bg-[#004E64] text-white text-[11px] font-medium px-3 py-1.5 rounded-md whitespace-nowrap shadow-lg"
+          data-sd-id="22">
+          Machinery
+          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#004E64] rotate-45" data-sd-id="23">
+          </div>
+        </div>
+      </button>
+
+      <!-- ALERTS (With Badge) -->
+      <button
+        class="dock-item relative w-12 h-12 rounded-full flex items-center justify-center cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#004E64] focus:ring-offset-2 focus:ring-offset-[#E0E5E9]"
+        data-sd-id="24">
+        <iconify-icon icon="lucide:triangle-alert" class="text-[22px]"></iconify-icon>
+        <div
+          class="absolute top-0 -right-1 bg-amber-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-sm border-2 border-[#E0E5E9]"
+          data-sd-id="25">3</div>
+        <div
+          class="tooltip absolute -top-10 left-1/2 bg-[#004E64] text-white text-[11px] font-medium px-3 py-1.5 rounded-md whitespace-nowrap shadow-lg"
+          data-sd-id="26">
+          Alerts
+          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#004E64] rotate-45" data-sd-id="27">
+          </div>
+        </div>
+      </button>
+
+      <!-- ANALYTICS -->
+      <button
+        class="dock-item relative w-12 h-12 rounded-full flex items-center justify-center cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#004E64] focus:ring-offset-2 focus:ring-offset-[#E0E5E9]"
+        data-sd-id="28">
+        <iconify-icon icon="lucide:activity" class="text-[22px]"></iconify-icon>
+        <div
+          class="tooltip absolute -top-10 left-1/2 bg-[#004E64] text-white text-[11px] font-medium px-3 py-1.5 rounded-md whitespace-nowrap shadow-lg"
+          data-sd-id="29">
+          Analytics
+          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#004E64] rotate-45" data-sd-id="30">
+          </div>
+        </div>
+      </button>
+
+      <!-- MAINTENANCE -->
+      <button
+        class="dock-item relative w-12 h-12 rounded-full flex items-center justify-center cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#004E64] focus:ring-offset-2 focus:ring-offset-[#E0E5E9]"
+        data-sd-id="31">
+        <iconify-icon icon="lucide:wrench" class="text-[22px]"></iconify-icon>
+        <div
+          class="tooltip absolute -top-10 left-1/2 bg-[#004E64] text-white text-[11px] font-medium px-3 py-1.5 rounded-md whitespace-nowrap shadow-lg"
+          data-sd-id="32">
+          Maintenance
+          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#004E64] rotate-45" data-sd-id="33">
+          </div>
+        </div>
+      </button>
+
+      <!-- SETTINGS -->
+      <button
+        class="dock-item relative w-12 h-12 rounded-full flex items-center justify-center cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#004E64] focus:ring-offset-2 focus:ring-offset-[#E0E5E9]"
+        data-sd-id="34">
+        <iconify-icon icon="lucide:sliders-horizontal" class="text-[22px]"></iconify-icon>
+        <div
+          class="tooltip absolute -top-10 left-1/2 bg-[#004E64] text-white text-[11px] font-medium px-3 py-1.5 rounded-md whitespace-nowrap shadow-lg"
+          data-sd-id="35">
+          Settings
+          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#004E64] rotate-45" data-sd-id="36">
+          </div>
+        </div>
+      </button>
+
+    </div>
+
+    <!-- Right: Station Selector -->
+    <div class="flex items-center pl-6 border-l border-[#004E64]/20 h-8" data-sd-id="37">
+      <button
+        class="flex items-center justify-between gap-3 bg-white/40 hover:bg-white/70 transition-colors px-4 py-1.5 rounded-full text-[#004E64] text-sm font-semibold tracking-wide focus:outline-none focus:ring-2 focus:ring-[#004E64]"
+        data-sd-id="38">
+        MAITRI
+        <iconify-icon icon="lucide:chevron-down" class="text-lg opacity-70"></iconify-icon>
+      </button>
+    </div>
+
+  </nav>
+
+  <script>
+    // Simple interaction logic to demonstrate active state switching
+    document.addEventListener('DOMContentLoaded', () => {
+      const dockItems = document.querySelectorAll('.dock-item');
+
+      dockItems.forEach(item => {
+        item.addEventListener('click', () => {
+          // Remove active class from all items
+          dockItems.forEach(el => {
+            el.classList.remove('active');
+            // Find the active indicator and hide it if needed (handled by CSS)
+          });
+
+          // Add active class to clicked item
+          item.classList.add('active');
+        });
+      });
+    });
+  </script>
+
+</body>
+
+</html>
+```
+
+Please reference this design and implement it into our codebase; Try to understand the structure, which part of our
+codebase is relevant and implement

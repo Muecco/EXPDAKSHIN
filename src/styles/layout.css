@@ -1,0 +1,424 @@
+/* ==========================================================================
+   DAKSHIN LAYOUT & SHELL FOUNDATIONS
+   Antarctic Operations Remote Control Center (PC2)
+   Dominant Light Surface: Mist Gray (#E0E5E9)
+   ========================================================================== */
+
+/* Master App Shell */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--mist-gray);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Background Watermark (From card nav prototype) */
+.bg-watermark {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.bg-watermark-text {
+  font-size: 20vw;
+  font-weight: 900;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--deep-teal);
+  opacity: 0.05;
+}
+
+/* Compact Mission Control Top Bar */
+.top-header {
+  height: 72px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(0, 78, 100, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  box-shadow: 0 4px 20px -8px rgba(0, 78, 100, 0.08);
+}
+
+.header-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-badge-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--mist-gray);
+  color: var(--deep-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.9rem;
+  font-style: italic;
+  box-shadow: 0 4px 12px rgba(0, 78, 100, 0.12);
+  border: 1px solid rgba(0, 78, 100, 0.1);
+}
+
+.header-title {
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--deep-teal);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-subtitle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-secondary);
+}
+
+/* Header Telemetry Strip */
+.header-meta-group {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.link-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--surface-white);
+  border: 1px solid rgba(0, 78, 100, 0.15);
+}
+
+.link-status-online {
+  color: var(--status-normal);
+  border-color: var(--status-normal-border);
+  background: var(--status-normal-bg);
+}
+
+.link-status-offline {
+  color: var(--status-critical);
+  border-color: var(--status-critical-border);
+  background: var(--status-critical-bg);
+}
+
+.link-status-reconnecting {
+  color: var(--status-warning);
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+}
+
+.header-telemetry-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.header-telemetry-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.header-telemetry-val {
+  color: var(--deep-teal);
+  font-weight: 700;
+}
+
+/* Main Viewport */
+.main-viewport {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 10;
+  padding: 2rem 2.5rem 7.5rem 2.5rem;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Floating Motion Dock Rail Container */
+.dock-rail-container {
+  position: fixed;
+  bottom: 1.75rem;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 50;
+  padding: 0 1rem;
+}
+
+.dock-rail-container > * {
+  pointer-events: auto;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.status-badge-normal {
+  background: var(--status-normal-bg);
+  color: var(--status-normal);
+  border: 1px solid var(--status-normal-border);
+}
+
+.status-badge-warning {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+  border: 1px solid var(--status-warning-border);
+}
+
+.status-badge-critical {
+  background: var(--status-critical-bg);
+  color: var(--status-critical);
+  border: 1px solid var(--status-critical-border);
+}
+
+.status-badge-offline {
+  background: var(--status-offline-bg);
+  color: var(--status-offline);
+  border: 1px solid var(--status-offline-border);
+}
+
+/* Responsive Rules */
+@media (max-width: 1024px) {
+  .main-viewport {
+    padding: 1.25rem 1.25rem 7rem 1.25rem;
+  }
+}
+
+/* ==========================================================================
+   LANDING PAGE DUAL MOVING WATERMARK, REVEAL LAYER & GHOST CURSOR HUD
+   ========================================================================== */
+
+/* Watermark Container & Marquee Tracks */
+.landing-watermark-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+
+.landing-watermark-row {
+  display: flex;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.landing-watermark-track {
+  display: flex;
+  flex-shrink: 0;
+  will-change: transform;
+}
+
+.landing-watermark-track > span {
+  font-size: 20vw;
+  font-weight: 900;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--deep-teal);
+  opacity: 0.045;
+  padding: 0 3vw;
+  display: inline-block;
+}
+
+.track-left {
+  animation: dakshinDriftLeft 90s linear infinite;
+}
+
+.track-right {
+  animation: dakshinDriftRight 105s linear infinite;
+}
+
+@keyframes dakshinDriftLeft {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+@keyframes dakshinDriftRight {
+  0% {
+    transform: translate3d(-100%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Second Antarctic Station Ghost Reveal Layer */
+.landing-station-reveal {
+  position: absolute;
+  inset: 0;
+  background-image: url(/assets/antarctic-station-reveal.jpg);
+  background-size: cover;
+  background-position: center 30%;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  filter: contrast(110%) brightness(1.02) saturate(1.1);
+  -webkit-mask-image: radial-gradient(
+    circle 260px at var(--reveal-x, -9999px) var(--reveal-y, -9999px),
+    rgba(0, 0, 0, 0.92) 0%,
+    rgba(0, 0, 0, 0.72) 35%,
+    rgba(0, 0, 0, 0.25) 65%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  mask-image: radial-gradient(
+    circle 260px at var(--reveal-x, -9999px) var(--reveal-y, -9999px),
+    rgba(0, 0, 0, 0.92) 0%,
+    rgba(0, 0, 0, 0.72) 35%,
+    rgba(0, 0, 0, 0.25) 65%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+.landing-station-reveal.is-active {
+  opacity: 1;
+}
+
+/* Minimal Scientific Ghost Cursor HUD Overlay */
+.landing-cursor-hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 42px;
+  height: 42px;
+  margin-top: -21px;
+  margin-left: -21px;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  will-change: transform;
+}
+
+.landing-cursor-hud.is-active {
+  opacity: 1;
+}
+
+.hud-reticle {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 78, 100, 0.35);
+  box-shadow: 0 0 10px rgba(0, 78, 100, 0.1), inset 0 0 6px rgba(0, 78, 100, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-reticle::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px dashed rgba(0, 78, 100, 0.25);
+}
+
+.hud-crosshair {
+  position: relative;
+  width: 10px;
+  height: 10px;
+}
+
+.hud-crosshair::before,
+.hud-crosshair::after {
+  content: '';
+  position: absolute;
+  background-color: rgba(0, 78, 100, 0.65);
+}
+
+.hud-crosshair::before {
+  top: 4.5px;
+  left: 0;
+  width: 10px;
+  height: 1px;
+}
+
+.hud-crosshair::after {
+  top: 0;
+  left: 4.5px;
+  width: 1px;
+  height: 10px;
+}
+
+/* Touch, Mobile & Reduced Motion Overrides */
+@media (hover: none) or (pointer: coarse), (max-width: 768px) {
+  .landing-cursor-hud,
+  .landing-station-reveal {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track-left,
+  .track-right {
+    animation: none !important;
+  }
+  .landing-cursor-hud {
+    display: none !important;
+  }
+}
+

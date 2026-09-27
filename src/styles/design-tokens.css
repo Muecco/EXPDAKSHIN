@@ -1,0 +1,228 @@
+/* ==========================================================================
+   DAKSHIN DESIGN SYSTEM — DESIGN TOKENS & FOUNDATIONS
+   Antarctic Operations Remote Control Center (PC2)
+   Dominant Light Surface: Mist Gray (#E0E5E9)
+   Primary Structural & Accent Color: Deep Teal (#004E64)
+   ========================================================================== */
+
+:root {
+  /* --- Primary Design Anchors --- */
+  --mist-gray: #E0E5E9;
+  --mist-gray-light: #EEF2F5;
+  --mist-gray-dark: #CAD3D9;
+  --mist-gray-surface: rgba(224, 229, 233, 0.85);
+  --mist-gray-glass: rgba(224, 229, 233, 0.65);
+  --mist-gray-border: rgba(0, 78, 100, 0.15);
+
+  --surface-white: #FFFFFF;
+  --surface-card: rgba(255, 255, 255, 0.92);
+  --surface-elevated: #F8FAFC;
+
+  --deep-teal: #004E64;
+  --deep-teal-light: #006884;
+  --deep-teal-dark: #003645;
+  --deep-teal-surface: rgba(0, 78, 100, 0.08);
+  --deep-teal-border: rgba(0, 78, 100, 0.20);
+  --deep-teal-subtle: rgba(0, 78, 100, 0.05);
+
+  /* --- Text Hierarchy --- */
+  --text-primary: #004E64;
+  --text-secondary: rgba(0, 78, 100, 0.72);
+  --text-muted: rgba(0, 78, 100, 0.48);
+  --text-on-teal: #E0E5E9;
+  --text-on-teal-muted: rgba(224, 229, 233, 0.75);
+
+  /* --- Semantic Operational Status Palette --- */
+  --status-normal: #0E9F6E;
+  --status-normal-bg: rgba(14, 159, 110, 0.12);
+  --status-normal-border: rgba(14, 159, 110, 0.35);
+
+  --status-warning: #D97706;
+  --status-warning-bg: rgba(217, 119, 6, 0.12);
+  --status-warning-border: rgba(217, 119, 6, 0.35);
+
+  --status-critical: #DC2626;
+  --status-critical-bg: rgba(220, 38, 38, 0.12);
+  --status-critical-border: rgba(220, 38, 38, 0.35);
+
+  --status-failed: #991B1B;
+  --status-failed-bg: rgba(153, 27, 27, 0.15);
+  --status-failed-border: rgba(153, 27, 27, 0.40);
+
+  --status-offline: #64748B;
+  --status-offline-bg: rgba(100, 116, 139, 0.12);
+  --status-offline-border: rgba(100, 116, 139, 0.30);
+
+  --status-unknown: #94A3B8;
+  --status-unknown-bg: rgba(148, 163, 184, 0.10);
+  --status-unknown-border: rgba(148, 163, 184, 0.25);
+
+  --status-info: #0284C7;
+  --status-info-bg: rgba(2, 132, 199, 0.12);
+  --status-info-border: rgba(2, 132, 199, 0.30);
+
+  /* --- Typography --- */
+  --font-heading: 'Epilogue', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* --- Radii & Elevation --- */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-card: 2.5rem;   /* From card nav prototype */
+  --radius-nav: 3rem;      /* From card nav prototype */
+  --radius-full: 9999px;
+
+  --shadow-dock: 0 10px 40px -10px rgba(0, 0, 0, 0.25), 0 4px 10px -4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-card: 0 20px 40px -15px rgba(0, 78, 100, 0.15), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-teal-card: 0 25px 50px -12px rgba(0, 78, 100, 0.35);
+  --shadow-nav: 0 20px 45px -10px rgba(0, 78, 100, 0.12);
+
+  /* --- Transitions --- */
+  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --transition-drawer: 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- Atmospheric Mist Gray Frost & Ice Crystal Identity --- */
+.frost-texture-overlay {
+  background-color: var(--mist-gray);
+  background-image: 
+    radial-gradient(ellipse 100% 60% at 50% 0%, rgba(255, 255, 255, 0.7) 0%, transparent 80%),
+    url("data:image/svg+xml,%3Csvg width='60' height='103.923' viewBox='0 0 60 103.923' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l30 17.32v34.641L30 69.282 0 51.961V17.32zM30 103.923L0 86.603V51.961l30 17.321 30-17.32v34.642z' fill='none' stroke='%23004E64' stroke-width='0.4' stroke-opacity='0.045'/%3E%3C/svg%3E");
+}
+
+/* Subtle Ice Crystal Surface Card Texture */
+.ice-surface-texture {
+  background-image: url("data:image/svg+xml,%3Csvg width='40' height='69.282' viewBox='0 0 40 69.282' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 0l20 11.547v23.094L20 46.188 0 34.641V11.547z' fill='none' stroke='%23004E64' stroke-width='0.35' stroke-opacity='0.035'/%3E%3C/svg%3E");
+}
+
+/* --- Frosted Card & Panel Language (Mist Gray Surface) --- */
+.frost-card {
+  background: var(--surface-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 78, 100, 0.10);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  color: var(--text-primary);
+  position: relative;
+}
+
+.mist-card {
+  background: var(--mist-gray-light);
+  border: 1px solid var(--mist-gray-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(0, 78, 100, 0.05);
+  color: var(--text-primary);
+}
+
+/* Deep Teal Card (From card nav prototype: bg-[#004E64] text-[#E0E5E9]) */
+.teal-station-card {
+  background: var(--deep-teal);
+  color: var(--text-on-teal);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-teal-card);
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.teal-station-card:hover {
+  transform: translateY(-8px) scale(1.01);
+  box-shadow: 0 30px 60px -12px rgba(0, 78, 100, 0.45);
+}
+
+/* --- Motion Dock Glassmorphism (Direct from prototype) --- */
+.glass-dock {
+  background: rgba(224, 229, 233, 0.90);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 78, 100, 0.2);
+  box-shadow: var(--shadow-dock);
+}
+
+.dock-item {
+  transition: all var(--transition-fast);
+  color: var(--deep-teal);
+}
+
+.dock-item:hover {
+  transform: translateY(-4px) scale(1.12);
+  background-color: rgba(0, 78, 100, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 78, 100, 0.15);
+}
+
+.dock-item.active {
+  background-color: var(--deep-teal);
+  color: #FFFFFF !important;
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 78, 100, 0.35);
+}
+
+/* Tooltip from motion dock prototype */
+.dock-tooltip {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px) translateX(-50%);
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.dock-item:hover .dock-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-4px) translateX(-50%);
+}
+
+.dock-active-indicator {
+  opacity: 0;
+  transform: scaleX(0);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dock-item.active .dock-active-indicator {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+/* --- Pulsing Operational Status Indicator --- */
+@keyframes pulse-dot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(14, 159, 110, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 5px rgba(14, 159, 110, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(14, 159, 110, 0);
+  }
+}
+
+.status-dot-pulse {
+  animation: pulse-dot 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* --- Watermark Outlined Antarctic Typography (From card nav prototype) --- */
+.text-outline {
+  color: transparent;
+  -webkit-text-stroke: 1px var(--deep-teal);
+  opacity: 0.05;
+}
+
+/* --- Reduced Motion Accessibility --- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .status-dot-pulse {
+    animation: none !important;
+  }
+}

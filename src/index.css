@@ -1,0 +1,62 @@
+/* ==========================================================================
+   DAKSHIN ROOT STYLESHEET
+   Antarctic Operations Remote Control Center (PC2)
+   ========================================================================== */
+
+@import './styles/design-tokens.css';
+@import './styles/layout.css';
+
+/* CSS Reset & Operational Baseline */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background-color: var(--mist-gray);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Custom Scrollbar for Mission Control */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--mist-gray-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--deep-teal);
+  border-radius: var(--radius-full);
+  opacity: 0.6;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--deep-teal-light);
+}
