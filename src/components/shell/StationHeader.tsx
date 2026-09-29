@@ -1,13 +1,14 @@
 import React from 'react';
 import { useStation } from '../../context/StationContext';
 import { useSimulation } from '../../context/SimulationContext';
-import { Radio, ArrowLeft, Thermometer, Wind, ShieldCheck, Wifi, WifiOff, Cpu, Play } from 'lucide-react';
+import { Radio, ArrowLeft, Thermometer, Wind, ShieldCheck, Wifi, WifiOff, Cpu, Play, Bot, Sparkles } from 'lucide-react';
 
 interface StationHeaderProps {
   onBackToWelcome?: () => void;
+  onOpenCopilot?: () => void;
 }
 
-export const StationHeader: React.FC<StationHeaderProps> = ({ onBackToWelcome }) => {
+export const StationHeader: React.FC<StationHeaderProps> = ({ onBackToWelcome, onOpenCopilot }) => {
   const {
     selectedStation,
     localStationTime,
@@ -216,6 +217,31 @@ export const StationHeader: React.FC<StationHeaderProps> = ({ onBackToWelcome })
             <span>{stationHealthPct}% HEALTH</span>
           </div>
         </div>
+
+        {/* RAG Copilot Button */}
+        <button
+          onClick={onOpenCopilot}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.4rem 0.85rem',
+            borderRadius: 'var(--radius-full)',
+            background: 'linear-gradient(135deg, rgba(0, 78, 100, 0.15) 0%, rgba(0, 168, 150, 0.2) 100%)',
+            border: '1px solid rgba(0, 168, 150, 0.35)',
+            color: 'var(--deep-teal)',
+            fontSize: '0.78rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 8px rgba(0, 78, 100, 0.1)',
+          }}
+          title="Open DAKSHIN RAG Diagnostic Copilot"
+        >
+          <Bot size={15} style={{ color: '#00A896' }} />
+          <span>ASK COPILOT</span>
+          <Sparkles size={13} style={{ color: '#F59E0B' }} />
+        </button>
 
         {/* Local Station Clock */}
         <div className="header-telemetry-pill">

@@ -10,12 +10,14 @@ import {
   Wrench,
   SlidersHorizontal,
   ChevronDown,
+  Bot,
 } from 'lucide-react';
 import { useStation } from '../../context/StationContext';
 
 export interface MotionDockProps {
   currentRoute: string;
   onRouteChange: (route: string) => void;
+  onOpenCopilot?: () => void;
 }
 
 interface NavItem {
@@ -23,10 +25,12 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
   badge?: number;
+  isAction?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { id: '/overview', label: 'Overview', icon: Radar },
+  { id: '/copilot', label: 'RAG Copilot', icon: Bot, isAction: true },
   { id: '/stations', label: 'Stations', icon: MountainSnow },
   { id: '/digital-twin', label: 'Digital Twin', icon: Box },
   { id: '/machinery', label: 'Machinery', icon: Cog },
@@ -36,7 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: '/settings', label: 'Settings', icon: SlidersHorizontal },
 ];
 
-export const MotionDock: React.FC<MotionDockProps> = ({ currentRoute, onRouteChange }) => {
+export const MotionDock: React.FC<MotionDockProps> = ({ currentRoute, onRouteChange, onOpenCopilot }) => {
   const { selectedStation, allStations, selectStation, connectionStatus } = useStation();
   const [isStationMenuOpen, setIsStationMenuOpen] = useState(false);
 
@@ -154,7 +158,13 @@ export const MotionDock: React.FC<MotionDockProps> = ({ currentRoute, onRouteCha
                 return (
                   <button
                     key={item.id}
-                    onClick={() => onRouteChange(item.id)}
+                    onClick={() => {
+                      if (item.isAction && item.id === '/copilot') {
+                        onOpenCopilot?.();
+                      } else {
+                        onRouteChange(item.id);
+                      }
+                    }}
                     className={`dock-item ${isActive ? 'active' : ''}`}
                     style={{
                       position: 'relative',

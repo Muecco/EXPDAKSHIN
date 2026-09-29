@@ -10,6 +10,7 @@ import { MachineryPage } from './pages/Machinery/MachineryPage';
 import { AlertsPage } from './pages/Alerts/AlertsPage';
 import { AnalyticsPage } from './pages/Analytics/AnalyticsPage';
 import { SimulationControlDrawer } from './components/simulation/SimulationControlDrawer';
+import { RagCopilotDrawer } from './components/copilot/RagCopilotDrawer';
 import { SectionPlaceholder } from './pages/SectionPlaceholder';
 import {
   MountainSnow,
@@ -20,6 +21,7 @@ import type { StationId } from './types';
 
 const MainApplication: React.FC = () => {
   const { selectedStationId, selectStation, clearStationSelection } = useStation();
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
   // Internal route state with URL path synchronization
   const [currentRoute, setCurrentRoute] = useState<string>(() => {
@@ -76,7 +78,7 @@ const MainApplication: React.FC = () => {
       </div>
 
       {/* Top Station Header */}
-      <StationHeader onBackToWelcome={clearStationSelection} />
+      <StationHeader onBackToWelcome={clearStationSelection} onOpenCopilot={() => setIsCopilotOpen(true)} />
 
       {/* Main Viewport Container */}
       <main className="main-viewport">
@@ -136,11 +138,14 @@ const MainApplication: React.FC = () => {
 
       {/* Floating Operations Motion Dock Rail */}
       <div className="dock-rail-container">
-        <MotionDock currentRoute={currentRoute} onRouteChange={handleRouteChange} />
+        <MotionDock currentRoute={currentRoute} onRouteChange={handleRouteChange} onOpenCopilot={() => setIsCopilotOpen(true)} />
       </div>
 
       {/* Floating Simulation Control Drawer & Lab */}
       <SimulationControlDrawer />
+
+      {/* DAKSHIN Antarctic RAG Copilot Chatbot */}
+      <RagCopilotDrawer isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
     </div>
   );
 };
