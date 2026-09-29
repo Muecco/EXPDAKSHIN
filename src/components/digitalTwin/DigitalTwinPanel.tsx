@@ -8,6 +8,10 @@ import {
   Wind,
   ShieldCheck,
   CloudSnow,
+  Eye,
+  Layers,
+  Network,
+  Flame,
 } from 'lucide-react';
 import { useStation } from '../../context/StationContext';
 import { useSimulation } from '../../context/SimulationContext';
@@ -20,6 +24,9 @@ import { getDefaultStationWeather, WEATHER_PRESETS } from '../../services/weathe
 import { AntarcticWeatherSystem } from './weatherSystem';
 import { AssetDetailPanel } from './AssetDetailPanel';
 import { RoleSwitcher } from './RoleSwitcher';
+import { BharatiStation } from './bharati/BharatiStation';
+import type { VisionMode, HeatMapMetric, CameraPresetId } from './bharati/types';
+import { HEAT_MAP_CONFIGS } from './bharati/HeatMapController';
 
 interface DigitalTwinPanelProps {
   onSelectAsset?: (asset: MachineTelemetry) => void;
@@ -27,7 +34,7 @@ interface DigitalTwinPanelProps {
   compact?: boolean;
 }
 
-// 3D status → color mapping (single source of truth)
+// 3D status → color mapping
 function assetStatusColor(statusOrAsset: OperationalStatus | MachineTelemetry): string {
   const status = typeof statusOrAsset === 'string' ? statusOrAsset : statusOrAsset.status;
   if (status === 'CRITICAL' || status === 'FAILED') return '#DC2626';
@@ -51,12 +58,16 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
   const [activeAsset, setActiveAsset] = useState<MachineTelemetry | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
-  // Demo role for access-gated UI (frontend only)
+  // Digital Twin Vision Modes
+  const [visionMode, setVisionMode] = useState<VisionMode>('NORMAL');
+  const [heatMapMetric, setHeatMapMetric] = useState<HeatMapMetric>('temperature');
+
+  // Demo role for access-gated UI
   const [userRole, setUserRole] = useState<UserRole>('OPERATOR');
 
-  // Frontend-only Antarctic Weather State
+  // Antarctic Weather State
   const [weather, setWeather] = useState<WeatherCondition>(() =>
-    getDefaultStationWeather(selectedStation?.id || 'maitri')
+    getDefaultStationWeather(selectedStation?.id || 'bharati')
   );
   const weatherRef = useRef<WeatherCondition>(weather);
   weatherRef.current = weather;
@@ -105,36 +116,56 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const assetMeshesRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const weatherSystemRef = useRef<AntarcticWeatherSystem | null>(null);
+  const bharatiStationRef = useRef<BharatiStation | null>(null);
 
-  // Selection highlight refs — store the selection ring mesh per asset
+  // Selection highlight refs
   const selectionRingRef = useRef<THREE.Mesh | null>(null);
   const activeAssetRef = useRef<MachineTelemetry | null>(null);
   activeAssetRef.current = activeAsset;
 
+  // Handle Vision Mode switches
+  useEffect(() => {
+    if (bharatiStationRef.current && stationData) {
+      bharatiStationRef.current.setVisionMode(
+        visionMode,
+        heatMapMetric,
+        stationData.assets,
+        currentAtmospheric
+      );
+    }
+  }, [visionMode, heatMapMetric, stationData, currentAtmospheric]);
+
   // Real-time reactive mesh status updates from simulation without rebuilding scene
   useEffect(() => {
-    if (!assetMeshesRef.current || !machineryAssets) return;
-    Object.values(machineryAssets).forEach((asset) => {
-      const group = assetMeshesRef.current.get(asset.asset_id);
-      if (!group) return;
-      const colorHex = assetStatusColor(asset.status);
-      const isCritical = asset.status === 'CRITICAL' || asset.status === 'FAILED';
-      const isWarn = asset.status === 'WARNING' || asset.status === 'DEGRADING';
-      const emissiveIntensity = isCritical ? 0.45 : isWarn ? 0.22 : 0.05;
+    if (!machineryAssets) return;
 
-      group.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          if (child.material instanceof THREE.MeshStandardMaterial) {
-            child.material.color.set(colorHex);
-            child.material.emissive.set(colorHex);
-            child.material.emissiveIntensity = emissiveIntensity;
-          } else if (child.material instanceof THREE.MeshBasicMaterial) {
-            child.material.color.set(colorHex);
+    if (bharatiStationRef.current) {
+      bharatiStationRef.current.updateTelemetry(machineryAssets, currentAtmospheric);
+    }
+
+    if (assetMeshesRef.current) {
+      Object.values(machineryAssets).forEach((asset) => {
+        const group = assetMeshesRef.current.get(asset.asset_id);
+        if (!group) return;
+        const colorHex = assetStatusColor(asset.status);
+        const isCritical = asset.status === 'CRITICAL' || asset.status === 'FAILED';
+        const isWarn = asset.status === 'WARNING' || asset.status === 'DEGRADING';
+        const emissiveIntensity = isCritical ? 0.45 : isWarn ? 0.22 : 0.05;
+
+        group.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            if (child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.color.set(colorHex);
+              child.material.emissive.set(colorHex);
+              child.material.emissiveIntensity = emissiveIntensity;
+            } else if (child.material instanceof THREE.MeshBasicMaterial) {
+              child.material.color.set(colorHex);
+            }
           }
-        }
+        });
       });
-    });
-  }, [machineryAssets]);
+    }
+  }, [machineryAssets, currentAtmospheric]);
 
   // Real-time reactive weather updates from simulation
   useEffect(() => {
@@ -157,22 +188,30 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     }
   }, [currentAtmospheric]);
 
-  const setCameraPreset = (preset: 'iso' | 'top' | 'side') => {
+  const setCameraPreset = (preset: CameraPresetId) => {
     if (!cameraRef.current || !controlsRef.current) return;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
     switch (preset) {
-      case 'iso':
-        camera.position.set(16, 12, 18);
-        controls.target.set(0, 1.5, 0);
+      case 'aerial':
+        camera.position.set(18, 14, 20);
+        controls.target.set(0, 3.0, 0);
         break;
-      case 'top':
-        camera.position.set(0, 26, 0.1);
-        controls.target.set(0, 0, 0);
+      case 'front':
+        camera.position.set(17, 4.8, 0);
+        controls.target.set(0, 3.8, 0);
         break;
       case 'side':
-        camera.position.set(0, 4, 22);
-        controls.target.set(0, 1.5, 0);
+        camera.position.set(0, 4.8, 22);
+        controls.target.set(0, 3.8, 0);
+        break;
+      case 'infra':
+        camera.position.set(-11, 5.5, -8);
+        controls.target.set(-4.5, 2.5, 0);
+        break;
+      case 'plan':
+        camera.position.set(0, 28, 0.1);
+        controls.target.set(0, 0, 0);
         break;
     }
     controls.update();
@@ -183,7 +222,6 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     const scene = sceneRef.current;
     if (!scene) return;
 
-    // Remove old highlight ring
     if (selectionRingRef.current) {
       scene.remove(selectionRingRef.current);
       selectionRingRef.current.geometry.dispose();
@@ -191,16 +229,17 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
       selectionRingRef.current = null;
     }
 
-    if (!assetId || !stationData) return;
+    if (bharatiStationRef.current) {
+      bharatiStationRef.current.selectAsset(assetId);
+    }
 
-    const group = assetMeshesRef.current.get(assetId);
-    if (!group) return;
+    if (!assetId || !stationData) return;
 
     const asset = stationData.assets[assetId as MachineAssetId];
     if (!asset) return;
 
-    // Animated selection ring — slightly larger than the existing base ring
-    const ringGeo = new THREE.RingGeometry(1.35, 1.55, 32);
+    // Animated selection ring
+    const ringGeo = new THREE.RingGeometry(1.4, 1.62, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: '#FFFFFF',
       side: THREE.DoubleSide,
@@ -210,7 +249,7 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.x = -Math.PI / 2;
-    ring.position.set(asset.position[0], 0.03, asset.position[2]);
+    ring.position.set(asset.position[0], 0.05, asset.position[2]);
     ring.name = '__selectionRing__';
     scene.add(ring);
     selectionRingRef.current = ring;
@@ -222,17 +261,17 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     const container = containerRef.current;
     const canvas = canvasRef.current;
     const width = container.clientWidth;
-    const height = compact ? 380 : 520;
+    const height = compact ? 420 : 580;
 
     // 1. Scene
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     scene.background = new THREE.Color('#C4D4DE');
-    scene.fog = new THREE.FogExp2('#C4D4DE', 0.016);
+    scene.fog = new THREE.FogExp2('#C4D4DE', 0.015);
 
     // 2. Camera
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 120);
-    camera.position.set(16, 12, 18);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 140);
+    camera.position.set(18, 14, 20);
     cameraRef.current = camera;
 
     // 3. Renderer
@@ -246,41 +285,41 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.08;
     rendererRef.current = renderer;
 
     // 4. Orbit Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
-    controls.target.set(0, 1.5, 0);
-    controls.maxPolarAngle = Math.PI / 2 - 0.04;
+    controls.target.set(0, 3.0, 0);
+    controls.maxPolarAngle = Math.PI / 2 - 0.02;
     controls.minDistance = 6;
-    controls.maxDistance = 45;
+    controls.maxDistance = 55;
     controlsRef.current = controls;
 
     // 5. Lighting
-    const ambientLight = new THREE.AmbientLight('#E8F1F5', 1.2);
+    const ambientLight = new THREE.AmbientLight('#E8F1F5', 1.25);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight('#FFFFFF', 2.0);
-    sunLight.position.set(22, 28, 16);
+    const sunLight = new THREE.DirectionalLight('#FFFFFF', 2.2);
+    sunLight.position.set(24, 32, 18);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 1024;
-    sunLight.shadow.mapSize.height = 1024;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 5;
-    sunLight.shadow.camera.far = 70;
-    sunLight.shadow.camera.left = -20;
-    sunLight.shadow.camera.right = 20;
-    sunLight.shadow.camera.top = 20;
-    sunLight.shadow.camera.bottom = -20;
+    sunLight.shadow.camera.far = 85;
+    sunLight.shadow.camera.left = -22;
+    sunLight.shadow.camera.right = 22;
+    sunLight.shadow.camera.top = 22;
+    sunLight.shadow.camera.bottom = -22;
     scene.add(sunLight);
 
-    const polarBounceLight = new THREE.HemisphereLight('#FFFFFF', '#B8CCD6', 0.7);
+    const polarBounceLight = new THREE.HemisphereLight('#FFFFFF', '#B8CCD6', 0.75);
     scene.add(polarBounceLight);
 
-    // 6. Ground
-    const groundGeo = new THREE.PlaneGeometry(80, 80, 32, 32);
+    // 6. Ground & Larsemann Hills Terrain
+    const groundGeo = new THREE.PlaneGeometry(100, 100, 32, 32);
     const groundMat = new THREE.MeshStandardMaterial({
       color: '#E0E7EC',
       roughness: 0.85,
@@ -292,38 +331,59 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     ground.receiveShadow = true;
     scene.add(ground);
 
+    // Rocky outcrops characteristic of Larsemann Hills
+    const rockMat = new THREE.MeshStandardMaterial({ color: '#556573', roughness: 0.95 });
+    [
+      [-14, 0.4, -12, 4.5, 0.8, 4.0],
+      [16, 0.6, -14, 5.0, 1.2, 5.0],
+      [-12, 0.5, 14, 4.0, 1.0, 4.5],
+      [15, 0.4, 15, 6.0, 0.9, 5.5],
+    ].forEach(([x, y, z, sx, sy, sz]) => {
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), rockMat);
+      rock.scale.set(sx, sy, sz);
+      rock.position.set(x, y, z);
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      scene.add(rock);
+    });
+
     // Weather System
     const weatherSys = new AntarcticWeatherSystem(scene, ground);
     weatherSystemRef.current = weatherSys;
 
     // Grid
-    const grid = new THREE.GridHelper(50, 25, '#004E64', '#B4C5CF');
+    const grid = new THREE.GridHelper(60, 30, '#004E64', '#B4C5CF');
     grid.position.y = 0.01;
     (grid.material as THREE.Material).opacity = 0.25;
     (grid.material as THREE.Material).transparent = true;
     scene.add(grid);
 
-    // 7. Station Architecture
-    const stationGroup = new THREE.Group();
-    scene.add(stationGroup);
-
     assetMeshesRef.current.clear();
 
-    const isMaitri = selectedStation.id === 'maitri';
+    // 7. Station Architecture Twin
+    const isBharati = selectedStation.id === 'bharati';
 
-    const structureMat = new THREE.MeshStandardMaterial({
-      color: isMaitri ? '#004E64' : '#F4F7F9',
-      roughness: 0.35,
-      metalness: 0.2,
-    });
-    const trimMat = new THREE.MeshStandardMaterial({ color: '#003645', roughness: 0.4 });
-    const steelStiltMat = new THREE.MeshStandardMaterial({
-      color: '#4A5B66',
-      roughness: 0.6,
-      metalness: 0.8,
-    });
+    if (isBharati) {
+      // MASTER DIGITAL TWIN: Detailed BHARATI Research Station
+      const bharatiStation = new BharatiStation();
+      bharatiStation.initializeTelemetry(stationData.assets);
+      scene.add(bharatiStation.rootGroup);
+      bharatiStationRef.current = bharatiStation;
 
-    if (isMaitri) {
+      // Register asset meshes for raycast selection
+      bharatiStation.equipment.assetGroups.forEach((group, assetId) => {
+        assetMeshesRef.current.set(assetId, group);
+      });
+    } else {
+      // Fallback for Maitri Station
+      bharatiStationRef.current = null;
+      const stationGroup = new THREE.Group();
+      scene.add(stationGroup);
+
+      const structureMat = new THREE.MeshStandardMaterial({ color: '#004E64', roughness: 0.35, metalness: 0.2 });
+      const trimMat = new THREE.MeshStandardMaterial({ color: '#003645', roughness: 0.4 });
+      const steelStiltMat = new THREE.MeshStandardMaterial({ color: '#4A5B66', roughness: 0.6, metalness: 0.8 });
+
       const hub = new THREE.Mesh(new THREE.BoxGeometry(7, 2.4, 4.5), structureMat);
       hub.position.set(0, 1.2, 0);
       hub.castShadow = true;
@@ -332,122 +392,35 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
 
       const roofTrim = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.2, 4.7), trimMat);
       roofTrim.position.set(0, 2.45, 0);
-      roofTrim.castShadow = true;
       stationGroup.add(roofTrim);
 
       const eastWing = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.2, 3.5), structureMat);
       eastWing.position.set(5.5, 1.1, 0.5);
-      eastWing.castShadow = true;
       stationGroup.add(eastWing);
 
       const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.8, 16), steelStiltMat);
       tunnel.rotation.z = Math.PI / 2;
       tunnel.position.set(3.4, 1.1, 0.3);
-      tunnel.castShadow = true;
       stationGroup.add(tunnel);
 
       const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.15, 6, 8), steelStiltMat);
       mast.position.set(2.5, 5, -1.5);
-      mast.castShadow = true;
       stationGroup.add(mast);
 
-      const dome = new THREE.Mesh(
-        new THREE.SphereGeometry(0.8, 16, 16),
-        new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.2 })
-      );
-      dome.position.set(-2, 2.8, 0);
-      dome.castShadow = true;
-      stationGroup.add(dome);
-    } else {
-      const mainBlock = new THREE.Mesh(new THREE.BoxGeometry(9.5, 2.6, 5), structureMat);
-      mainBlock.position.set(0, 2.7, 0);
-      mainBlock.castShadow = true;
-      mainBlock.receiveShadow = true;
-      stationGroup.add(mainBlock);
-
-      const nose = new THREE.Mesh(new THREE.ConeGeometry(2.5, 3.2, 4), structureMat);
-      nose.rotation.z = -Math.PI / 2;
-      nose.rotation.y = Math.PI / 4;
-      nose.position.set(5.8, 2.7, 0);
-      nose.castShadow = true;
-      stationGroup.add(nose);
-
-      const stiltPositions: [number, number, number][] = [
-        [-3.8, 1.0, -1.8], [-3.8, 1.0, 1.8],
-        [0, 1.0, -1.8],    [0, 1.0, 1.8],
-        [3.8, 1.0, -1.8],  [3.8, 1.0, 1.8],
-      ];
-      stiltPositions.forEach(([x, y, z]) => {
-        const stilt = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2.0, 12), steelStiltMat);
-        stilt.position.set(x, y, z);
-        stilt.castShadow = true;
-        stationGroup.add(stilt);
+      // Simple asset meshes for fallback
+      Object.values(stationData.assets).forEach((asset) => {
+        const assetGroup = new THREE.Group();
+        assetGroup.name = asset.asset_id;
+        assetGroup.position.set(...asset.position);
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), structureMat);
+        mesh.userData = { assetId: asset.asset_id };
+        assetGroup.add(mesh);
+        scene.add(assetGroup);
+        assetMeshesRef.current.set(asset.asset_id, assetGroup);
       });
-
-      const helideck = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.15, 24), trimMat);
-      helideck.position.set(-2.5, 4.1, 0);
-      helideck.castShadow = true;
-      stationGroup.add(helideck);
-
-      const commTower = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.12, 7.5, 8), steelStiltMat);
-      commTower.position.set(3.2, 6.2, -1.2);
-      commTower.castShadow = true;
-      stationGroup.add(commTower);
     }
 
-    // 8. Machinery Assets
-    Object.values(stationData.assets).forEach((asset) => {
-      const assetGroup = new THREE.Group();
-      assetGroup.name = asset.asset_id;
-      assetGroup.position.set(asset.position[0], asset.position[1], asset.position[2]);
-
-      const baseColor = assetStatusColor(asset);
-
-      let geom: THREE.BufferGeometry;
-      if (asset.asset_type === 'generator') {
-        geom = new THREE.BoxGeometry(1.4, 1.2, 1.8);
-      } else if (asset.asset_type === 'fuel_system') {
-        geom = new THREE.CylinderGeometry(1.0, 1.0, 2.2, 24);
-      } else if (asset.asset_type === 'pump') {
-        geom = new THREE.CylinderGeometry(0.5, 0.65, 1.2, 16);
-      } else if (asset.asset_type === 'battery') {
-        geom = new THREE.BoxGeometry(1.2, 1.0, 1.2);
-      } else {
-        geom = new THREE.BoxGeometry(1.1, 1.1, 1.1);
-      }
-
-      const mat = new THREE.MeshStandardMaterial({
-        color: baseColor,
-        roughness: 0.35,
-        metalness: 0.4,
-        emissive: baseColor,
-        emissiveIntensity: asset.status === 'CRITICAL' ? 0.35 : 0.05,
-      });
-
-      const mesh = new THREE.Mesh(geom, mat);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.userData = { assetId: asset.asset_id };
-      assetGroup.add(mesh);
-
-      // Base telemetry ring
-      const ringGeo = new THREE.RingGeometry(1.1, 1.25, 24);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: baseColor,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.6,
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = -asset.position[1] + 0.02;
-      assetGroup.add(ring);
-
-      scene.add(assetGroup);
-      assetMeshesRef.current.set(asset.asset_id, assetGroup);
-    });
-
-    // 9. Raycasting
+    // 8. Raycasting & Interaction
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -463,8 +436,9 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
       for (const hit of intersects) {
         let cur: THREE.Object3D | null = hit.object;
         while (cur && cur !== scene) {
-          if (cur.name && stationData.assets[cur.name as MachineAssetId]) {
-            foundAsset = stationData.assets[cur.name as MachineAssetId];
+          const directId = cur.userData?.assetId || cur.name;
+          if (directId && stationData.assets[directId as MachineAssetId]) {
+            foundAsset = stationData.assets[directId as MachineAssetId];
             break;
           }
           cur = cur.parent;
@@ -497,8 +471,9 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
       for (const hit of intersects) {
         let cur: THREE.Object3D | null = hit.object;
         while (cur && cur !== scene) {
-          if (cur.name && stationData.assets[cur.name as MachineAssetId]) {
-            const asset = stationData.assets[cur.name as MachineAssetId];
+          const directId = cur.userData?.assetId || cur.name;
+          if (directId && stationData.assets[directId as MachineAssetId]) {
+            const asset = stationData.assets[directId as MachineAssetId];
             setActiveAsset(asset);
             applySelectionHighlight(asset.asset_id);
             if (onSelectAsset) onSelectAsset(asset);
@@ -507,8 +482,6 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
           cur = cur.parent;
         }
       }
-      // Click on empty space — clear selection
-      // (Don't clear here — let user close via X in panel)
     };
 
     canvas.addEventListener('mousemove', handlePointerMove);
@@ -516,18 +489,18 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     canvas.addEventListener('mouseup', handlePointerUp);
     canvas.addEventListener('click', handleClick);
 
-    // 10. Resize
+    // 9. Resize
     const handleResize = () => {
       if (!container || !camera || !renderer) return;
       const w = container.clientWidth;
-      const h = compact ? 380 : 520;
+      const h = compact ? 420 : 580;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     };
     window.addEventListener('resize', handleResize);
 
-    // 11. Animation loop
+    // 10. Animation loop
     let animationFrameId: number;
     let lastTime = performance.now();
 
@@ -539,22 +512,19 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
 
       controls.update();
 
-      // Pulse critical machines
-      const time = Date.now() * 0.003;
-      assetMeshesRef.current.forEach((group, assetId) => {
-        const asset = stationData.assets[assetId as MachineAssetId];
-        if (asset && (asset.status === 'CRITICAL' || asset.status === 'FAILED')) {
-          const scale = 1.0 + Math.sin(time) * 0.04;
-          group.scale.set(scale, scale, scale);
-        }
-      });
+      const time = now * 0.001;
 
-      // Animate selection ring (subtle pulse + slow rotation)
+      // Update Bharati Master Twin (pipelines, beacons, pulses)
+      if (bharatiStationRef.current) {
+        bharatiStationRef.current.update(dt, time);
+      }
+
+      // Animate selection ring
       if (selectionRingRef.current) {
         const ring = selectionRingRef.current;
-        ring.rotation.z = time * 0.4;
+        ring.rotation.z = time * 0.8;
         const ringMat = ring.material as THREE.MeshBasicMaterial;
-        ringMat.opacity = 0.6 + Math.sin(time * 2.5) * 0.3;
+        ringMat.opacity = 0.6 + Math.sin(time * 3.0) * 0.35;
       }
 
       // Weather system update
@@ -574,12 +544,16 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
       canvas.removeEventListener('click', handleClick);
       cancelAnimationFrame(animationFrameId);
 
-      // Clean up selection ring
       if (selectionRingRef.current) {
         scene.remove(selectionRingRef.current);
         selectionRingRef.current.geometry.dispose();
         (selectionRingRef.current.material as THREE.Material).dispose();
         selectionRingRef.current = null;
+      }
+
+      if (bharatiStationRef.current) {
+        bharatiStationRef.current.dispose();
+        bharatiStationRef.current = null;
       }
 
       if (weatherSystemRef.current) {
@@ -592,6 +566,8 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
   }, [selectedStation, stationData, compact, onSelectAsset]);
 
   if (!selectedStation || !stationData) return null;
+
+  const currentHeatMapConfig = HEAT_MAP_CONFIGS[heatMapMetric];
 
   return (
     <div
@@ -608,7 +584,7 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
         flexDirection: 'column',
       }}
     >
-      {/* ── TOP OVERLAY ───────────────────────────────────────────────────── */}
+      {/* ── TOP OVERLAY: Station identity, weather, role ───────────────────── */}
       <div
         style={{
           position: 'absolute',
@@ -616,23 +592,23 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
           left: 0,
           right: 0,
           zIndex: 10,
-          padding: '1rem 1.5rem',
+          padding: '0.85rem 1.25rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '0.5rem',
           background:
-            'linear-gradient(to bottom, rgba(224, 229, 233, 0.95) 0%, rgba(224, 229, 233, 0) 100%)',
+            'linear-gradient(to bottom, rgba(224, 229, 233, 0.96) 0%, rgba(224, 229, 233, 0) 100%)',
           pointerEvents: 'none',
         }}
       >
         {/* Left: Station Identity */}
-        <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div
             style={{
-              width: '40px',
-              height: '40px',
+              width: '38px',
+              height: '38px',
               borderRadius: 'var(--radius-md)',
               backgroundColor: 'var(--deep-teal)',
               display: 'flex',
@@ -643,14 +619,14 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
               flexShrink: 0,
             }}
           >
-            <Box size={22} />
+            <Box size={20} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h3
                 style={{
                   fontFamily: 'var(--font-heading)',
-                  fontSize: '1.25rem',
+                  fontSize: '1.15rem',
                   fontWeight: 900,
                   color: 'var(--deep-teal)',
                   margin: 0,
@@ -661,32 +637,32 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
               </h3>
               <span
                 style={{
-                  fontSize: '0.65rem',
-                  padding: '0.2rem 0.55rem',
+                  fontSize: '0.62rem',
+                  padding: '0.15rem 0.45rem',
                   borderRadius: 'var(--radius-sm)',
-                  backgroundColor: 'rgba(0, 78, 100, 0.1)',
+                  backgroundColor: 'rgba(0, 78, 100, 0.12)',
                   color: 'var(--deep-teal)',
                   fontWeight: 800,
                   letterSpacing: '0.06em',
                 }}
               >
-                LIVE SYNCHRONIZATION
+                ARCHITECTURAL CAD MODEL
               </span>
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              High-fidelity structural layout &amp; synthetic machinery matrix
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
+              Bioclimatic Stilt Elevation • Aerodynamic Envelope • Real-Time Machinery Matrix
             </div>
           </div>
         </div>
 
-        {/* Right: Weather + Weather Presets + Camera + Role Switcher */}
+        {/* Right: Weather Pill + Weather Presets + Role Switcher */}
         <div
           style={{
             pointerEvents: 'auto',
             display: 'flex',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: '0.65rem',
+            gap: '0.5rem',
             justifyContent: 'flex-end',
           }}
         >
@@ -695,13 +671,13 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.65rem',
-              backgroundColor: 'rgba(255, 255, 255, 0.92)',
+              gap: '0.55rem',
+              backgroundColor: 'rgba(255, 255, 255, 0.94)',
               backdropFilter: 'blur(8px)',
-              padding: '0.35rem 0.8rem',
+              padding: '0.3rem 0.7rem',
               borderRadius: 'var(--radius-full)',
               border: '1px solid rgba(0, 78, 100, 0.15)',
-              fontSize: '0.72rem',
+              fontSize: '0.7rem',
               fontWeight: 700,
               color: 'var(--deep-teal)',
               boxShadow: '0 2px 6px rgba(0, 78, 100, 0.06)',
@@ -711,20 +687,20 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.3rem',
+                gap: '0.25rem',
                 color: weather.weatherState === 'BLIZZARD' ? '#DC2626' : 'var(--deep-teal)',
               }}
             >
-              <CloudSnow size={14} />
+              <CloudSnow size={13} />
               <span>{weather.weatherState.replace('_', ' ')}</span>
             </span>
             <span style={{ opacity: 0.25 }}>|</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <Thermometer size={13} /> {weather.temperature}°C
+              <Thermometer size={12} /> {weather.temperature}°C
             </span>
             <span style={{ opacity: 0.25 }}>|</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <Wind size={13} /> {weather.windSpeed} m/s {weather.windDirectionCardinal} ({weather.windDirection}°)
+              <Wind size={12} /> {weather.windSpeed} m/s
             </span>
           </div>
 
@@ -738,7 +714,6 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
               padding: '2px',
               borderRadius: 'var(--radius-md)',
               border: '1px solid rgba(0, 78, 100, 0.15)',
-              boxShadow: '0 2px 6px rgba(0, 78, 100, 0.05)',
             }}
             title="Antarctic Weather Simulation Preset"
           >
@@ -759,14 +734,13 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
                       setWeather((prev) => ({ ...prev, ...preset, temperature: prev.temperature }));
                     }}
                     style={{
-                      padding: '0.25rem 0.5rem',
-                      fontSize: '0.68rem',
+                      padding: '0.22rem 0.45rem',
+                      fontSize: '0.65rem',
                       fontWeight: isActive ? 800 : 600,
                       borderRadius: 'var(--radius-sm)',
                       backgroundColor: isActive ? 'var(--deep-teal)' : 'transparent',
                       color: isActive ? '#FFFFFF' : 'var(--deep-teal)',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease',
                       border: 'none',
                     }}
                   >
@@ -777,45 +751,252 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             )}
           </div>
 
-          {/* Camera Presets */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '0.25rem',
-              backgroundColor: 'rgba(255, 255, 255, 0.85)',
-              padding: '3px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid rgba(0, 78, 100, 0.12)',
-            }}
-          >
-            {(['iso', 'top', 'side'] as const).map((preset) => (
-              <button
-                key={preset}
-                onClick={() => setCameraPreset(preset)}
-                title={preset === 'iso' ? 'Isometric' : preset === 'top' ? 'Plan View' : 'Elevation View'}
-                style={{
-                  padding: '0.3rem 0.6rem',
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  borderRadius: 'var(--radius-sm)',
-                  color: 'var(--deep-teal)',
-                  cursor: 'pointer',
-                  border: 'none',
-                  background: 'transparent',
-                }}
-              >
-                {preset.toUpperCase()}
-              </button>
-            ))}
-          </div>
-
           {/* Demo Role Switcher */}
           <RoleSwitcher currentRole={userRole} onChange={setUserRole} />
         </div>
       </div>
 
+      {/* ── VISION MODE & CAMERA TOOLBAR (Floating below header) ───────────── */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '4.8rem',
+          left: '1.25rem',
+          right: '1.25rem',
+          zIndex: 15,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.65rem',
+          pointerEvents: 'none',
+        }}
+      >
+        {/* Left: 4 Master Vision Modes */}
+        <div
+          style={{
+            pointerEvents: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            backgroundColor: 'rgba(255, 255, 255, 0.94)',
+            backdropFilter: 'blur(10px)',
+            padding: '0.3rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid rgba(0, 78, 100, 0.2)',
+            boxShadow: '0 4px 14px rgba(0, 78, 100, 0.1)',
+          }}
+        >
+          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--deep-teal)', padding: '0 0.4rem' }}>
+            VISION:
+          </span>
+
+          <button
+            onClick={() => setVisionMode('NORMAL')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: visionMode === 'NORMAL' ? 'var(--deep-teal)' : 'transparent',
+              color: visionMode === 'NORMAL' ? '#FFFFFF' : 'var(--deep-teal)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Eye size={13} />
+            NORMAL 3D
+          </button>
+
+          <button
+            onClick={() => setVisionMode('XRAY')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: visionMode === 'XRAY' ? '#0284C7' : 'transparent',
+              color: visionMode === 'XRAY' ? '#FFFFFF' : 'var(--deep-teal)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Layers size={13} />
+            X-RAY
+          </button>
+
+          <button
+            onClick={() => setVisionMode('CONNECTIVITY')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: visionMode === 'CONNECTIVITY' ? '#D97706' : 'transparent',
+              color: visionMode === 'CONNECTIVITY' ? '#FFFFFF' : 'var(--deep-teal)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Network size={13} />
+            PIPELINES &amp; FLOW
+          </button>
+
+          <button
+            onClick={() => setVisionMode('HEAT_MAP')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: visionMode === 'HEAT_MAP' ? '#DC2626' : 'transparent',
+              color: visionMode === 'HEAT_MAP' ? '#FFFFFF' : 'var(--deep-teal)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Flame size={13} />
+            HEAT MAP
+          </button>
+        </div>
+
+        {/* Right: Camera Presets */}
+        <div
+          style={{
+            pointerEvents: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            backgroundColor: 'rgba(255, 255, 255, 0.92)',
+            backdropFilter: 'blur(8px)',
+            padding: '0.3rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid rgba(0, 78, 100, 0.15)',
+            boxShadow: '0 4px 14px rgba(0, 78, 100, 0.08)',
+          }}
+        >
+          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--deep-teal)', padding: '0 0.35rem' }}>
+            VIEW:
+          </span>
+          {(['aerial', 'front', 'side', 'infra', 'plan'] as CameraPresetId[]).map((preset) => (
+            <button
+              key={preset}
+              onClick={() => setCameraPreset(preset)}
+              style={{
+                padding: '0.3rem 0.55rem',
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--deep-teal)',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'transparent',
+              }}
+              title={`Switch camera to ${preset} view`}
+            >
+              {preset.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── HEAT MAP METRIC SUB-SELECTOR (Rendered when in HEAT_MAP mode) ───── */}
+      {visionMode === 'HEAT_MAP' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '7.8rem',
+            left: '1.25rem',
+            zIndex: 15,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            backgroundColor: 'rgba(15, 23, 42, 0.88)',
+            backdropFilter: 'blur(8px)',
+            padding: '0.35rem 0.6rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid rgba(220, 38, 38, 0.4)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+          }}
+        >
+          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#F8FAFC' }}>
+            METRIC:
+          </span>
+          {[
+            { id: 'temperature', label: 'TEMPERATURE (°C)' },
+            { id: 'wind', label: 'WIND EXPOSURE' },
+            { id: 'power', label: 'POWER DRAW' },
+            { id: 'structural', label: 'STRUCTURAL LOAD' },
+            { id: 'fuel', label: 'FUEL BUFFER' },
+          ].map(({ id, label }) => {
+            const isSel = heatMapMetric === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setHeatMapMetric(id as HeatMapMetric)}
+                style={{
+                  padding: '0.25rem 0.55rem',
+                  fontSize: '0.66rem',
+                  fontWeight: 800,
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: isSel ? '#DC2626' : 'rgba(255, 255, 255, 0.1)',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  border: 'none',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── PIPELINE CONNECTIVITY HELPER CHIP ───────────────────────────────── */}
+      {visionMode === 'CONNECTIVITY' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '7.8rem',
+            left: '1.25rem',
+            zIndex: 15,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(8px)',
+            padding: '0.4rem 0.85rem',
+            borderRadius: 'var(--radius-full)',
+            border: '1px solid rgba(217, 119, 6, 0.3)',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            color: '#B45309',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
+          }}
+        >
+          <Network size={14} />
+          <span>Interactive Connectivity: Click any equipment in the 3D twin to highlight connected pipelines &amp; telemetry flow.</span>
+        </div>
+      )}
+
       {/* ── 3D CANVAS ────────────────────────────────────────────────────── */}
-      <div style={{ width: '100%', height: compact ? '380px' : '520px', position: 'relative' }}>
+      <div style={{ width: '100%', height: compact ? '420px' : '580px', position: 'relative' }}>
         <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
 
         {/* Hover tooltip */}
@@ -832,7 +1013,7 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
               padding: '0.75rem 1rem',
               zIndex: 30,
               pointerEvents: 'none',
-              minWidth: '180px',
+              minWidth: '200px',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
@@ -858,16 +1039,57 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
                 {hoveredAsset.status}
               </span>
             </div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
               {hoveredAsset.name}
             </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              Click to open asset detail →
+            <div style={{ fontSize: '0.7rem', display: 'flex', gap: '0.6rem', color: 'var(--text-secondary)' }}>
+              <span>Temp: <strong>{hoveredAsset.temperature}°C</strong></span>
+              <span>Power: <strong>{hoveredAsset.power} kW</strong></span>
+            </div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              Click to open detailed telemetry &amp; controls →
             </div>
           </div>
         )}
 
-        {/* Asset Detail Panel — slides in from the right over the 3D canvas */}
+        {/* Floating Heat Map Colorbar Legend (Rendered when in HEAT_MAP mode) */}
+        {visionMode === 'HEAT_MAP' && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '4.5rem',
+              left: '1.5rem',
+              zIndex: 20,
+              backgroundColor: 'rgba(15, 23, 42, 0.92)',
+              backdropFilter: 'blur(8px)',
+              padding: '0.75rem 1.1rem',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
+              color: '#FFFFFF',
+              maxWidth: '360px',
+            }}
+          >
+            <div style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.04em', marginBottom: '0.4rem', color: '#93C5FD' }}>
+              {currentHeatMapConfig.label}
+            </div>
+            {/* Gradient bar */}
+            <div
+              style={{
+                height: '10px',
+                borderRadius: '5px',
+                marginBottom: '0.35rem',
+                background: `linear-gradient(to right, ${currentHeatMapConfig.gradient.map((g) => g.color).join(', ')})`,
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: '#CBD5E1' }}>
+              <span>{currentHeatMapConfig.min} {currentHeatMapConfig.unit}</span>
+              <span>{currentHeatMapConfig.max} {currentHeatMapConfig.unit}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Asset Detail Panel */}
         {liveActiveAsset && (
           <AssetDetailPanel
             asset={liveActiveAsset}
@@ -888,12 +1110,12 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
           left: 0,
           right: 0,
           zIndex: 10,
-          padding: '1rem 1.5rem',
+          padding: '0.85rem 1.25rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           background:
-            'linear-gradient(to top, rgba(224, 229, 233, 0.95) 0%, rgba(224, 229, 233, 0) 100%)',
+            'linear-gradient(to top, rgba(224, 229, 233, 0.96) 0%, rgba(224, 229, 233, 0) 100%)',
           pointerEvents: 'none',
         }}
       >
@@ -903,12 +1125,12 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             pointerEvents: 'auto',
             display: 'flex',
             alignItems: 'center',
-            gap: '1rem',
-            backgroundColor: 'rgba(255, 255, 255, 0.85)',
-            padding: '0.4rem 0.9rem',
+            gap: '0.85rem',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            padding: '0.35rem 0.85rem',
             borderRadius: 'var(--radius-full)',
             border: '1px solid rgba(0, 78, 100, 0.12)',
-            fontSize: '0.72rem',
+            fontSize: '0.7rem',
             fontWeight: 700,
           }}
         >
@@ -928,16 +1150,16 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
         {/* Controls hint */}
         <div
           style={{
-            fontSize: '0.7rem',
+            fontSize: '0.68rem',
             fontWeight: 600,
             color: 'var(--deep-teal)',
-            opacity: 0.8,
+            opacity: 0.85,
             display: 'flex',
             alignItems: 'center',
-            gap: '0.4rem',
+            gap: '0.35rem',
           }}
         >
-          <RotateCcw size={12} /> Rotate: Left-Click + Drag | Zoom: Scroll | Click asset to inspect
+          <RotateCcw size={12} /> Left-Click Drag: Rotate | Scroll: Zoom | Right-Click: Pan | Click machine/sensor to inspect
         </div>
 
         {/* Station Health */}
@@ -946,19 +1168,19 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             pointerEvents: 'auto',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.6rem',
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            padding: '0.4rem 0.9rem',
+            gap: '0.5rem',
+            backgroundColor: 'rgba(255, 255, 255, 0.92)',
+            padding: '0.35rem 0.85rem',
             borderRadius: 'var(--radius-full)',
             border: '1px solid rgba(0, 78, 100, 0.15)',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
           }}
         >
-          <ShieldCheck size={16} style={{ color: 'var(--status-normal)' }} />
-          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--deep-teal)', textTransform: 'uppercase' }}>
+          <ShieldCheck size={15} style={{ color: 'var(--status-normal)' }} />
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--deep-teal)', textTransform: 'uppercase' }}>
             Station Health:
           </span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '0.9rem', color: 'var(--status-normal)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '0.88rem', color: 'var(--status-normal)' }}>
             {stationData.calculated_health_pct}%
           </span>
         </div>
