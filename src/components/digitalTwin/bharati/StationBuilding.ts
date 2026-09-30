@@ -33,11 +33,26 @@ export class StationBuilding {
     gangwaySteel: THREE.MeshStandardMaterial;
   };
 
+  public edgeLinesGroup: THREE.Group;
+  public edgeLineMat: THREE.LineBasicMaterial;
+
   private isXRayMode: boolean = false;
+  private isThermalMode: boolean = false;
 
   constructor() {
     this.group = new THREE.Group();
     this.group.name = 'Bharati_StationBuilding';
+
+    this.edgeLinesGroup = new THREE.Group();
+    this.edgeLinesGroup.name = 'Bharati_EdgeHighlightLines';
+    this.group.add(this.edgeLinesGroup);
+
+    this.edgeLineMat = new THREE.LineBasicMaterial({
+      color: '#38BDF8',
+      transparent: true,
+      opacity: 0.0,
+      depthWrite: false,
+    });
 
     // Normal Materials
     this.materials = {
@@ -112,6 +127,10 @@ export class StationBuilding {
     this.group.add(level1Wall);
     this.shellMeshes.push(level1Wall);
 
+    const l1Edge = new THREE.LineSegments(new THREE.EdgesGeometry(level1Wall.geometry), this.edgeLineMat);
+    l1Edge.position.copy(level1Wall.position);
+    this.edgeLinesGroup.add(l1Edge);
+
     // Architectural Deep Teal belt trim between Level 1 and Level 2
     const midTrim = new THREE.Mesh(
       new THREE.BoxGeometry(13.6, 0.15, 7.6),
@@ -132,6 +151,10 @@ export class StationBuilding {
     level2Wall.receiveShadow = true;
     this.group.add(level2Wall);
     this.shellMeshes.push(level2Wall);
+
+    const l2Edge = new THREE.LineSegments(new THREE.EdgesGeometry(level2Wall.geometry), this.edgeLineMat);
+    l2Edge.position.copy(level2Wall.position);
+    this.edgeLinesGroup.add(l2Edge);
 
     // Roof Parapet / Fascia
     const roofFascia = new THREE.Mesh(
@@ -281,6 +304,10 @@ export class StationBuilding {
     noseMesh.receiveShadow = true;
     this.group.add(noseMesh);
     this.shellMeshes.push(noseMesh);
+
+    const noseEdge = new THREE.LineSegments(new THREE.EdgesGeometry(geom), this.edgeLineMat);
+    noseEdge.position.copy(noseMesh.position);
+    this.edgeLinesGroup.add(noseEdge);
 
     // Front nose edge highlight trim
     const noseAccent = new THREE.Mesh(
@@ -499,49 +526,119 @@ export class StationBuilding {
   }
 
   /**
-   * Toggles X-Ray vision mode for the station envelope
+   * Toggles X-Ray vision mode for the station envelope:
+   * Exterior walls become transparent architectural glass (~22% opacity)
+   * with crisp edge highlighting, revealing interior rooms, columns, machinery, and pipes.
    */
   public setXRayMode(enabled: boolean) {
     this.isXRayMode = enabled;
 
-    if (enabled) {
-      // Exterior wall panels become translucent glass
-      this.materials.wallPanel.transparent = true;
-      this.materials.wallPanel.opacity = 0.18;
-      this.materials.wallPanel.depthWrite = false;
-      this.materials.wallPanel.color.set('#60A5FA'); // Cool holographic cyan tint
+    if (this.isThermalMode && !enabled) {
+      this.applyThermalMaterials();
+      return;
+    }
 
-      // Roof surfaces become transparent so interior floors are directly inspectable
+    if (enabled) {
+      // Exterior wall panels become translucent architectural glass (~15-35% opacity)
+      this.materials.wallPanel.transparent = true;
+      this.materials.wallPanel.opacity = 0.22;
+      this.materials.wallPanel.depthWrite = false;
+      this.materials.wallPanel.color.set('#B8DEEE'); // cool architectural glass tint
+      this.materials.wallPanel.roughness = 0.15;
+      this.materials.wallPanel.metalness = 0.25;
+
+      // Roof surfaces become transparent so interior decks and rooms are directly inspectable
       this.materials.roofDeck.transparent = true;
-      this.materials.roofDeck.opacity = 0.12;
+      this.materials.roofDeck.opacity = 0.16;
       this.materials.roofDeck.depthWrite = false;
 
+      // Structural trim (prompts: ~50-80% opacity)
       this.materials.accentTrim.transparent = true;
-      this.materials.accentTrim.opacity = 0.35;
+      this.materials.accentTrim.opacity = 0.65;
       this.materials.accentTrim.depthWrite = false;
 
-      this.materials.windowGlass.opacity = 0.15;
+      this.materials.windowGlass.opacity = 0.18;
       this.materials.helideck.opacity = 0.25;
       this.materials.helideck.transparent = true;
+
+      // Crisp icy-blue edge lines outline the faceted aerodynamic volume
+      this.edgeLineMat.color.set('#38BDF8');
+      this.edgeLineMat.opacity = 0.70;
     } else {
-      // Restore normal architectural materials
-      this.materials.wallPanel.transparent = false;
-      this.materials.wallPanel.opacity = 1.0;
-      this.materials.wallPanel.depthWrite = true;
-      this.materials.wallPanel.color.set('#E8EFF4');
-
-      this.materials.roofDeck.transparent = false;
-      this.materials.roofDeck.opacity = 1.0;
-      this.materials.roofDeck.depthWrite = true;
-
-      this.materials.accentTrim.transparent = false;
-      this.materials.accentTrim.opacity = 1.0;
-      this.materials.accentTrim.depthWrite = true;
-
-      this.materials.windowGlass.opacity = 0.85;
-      this.materials.helideck.opacity = 1.0;
-      this.materials.helideck.transparent = false;
+      this.restoreNormalMaterials();
     }
+  }
+
+  /**
+   * Toggles Thermal Radiation Mode for the building envelope:
+   * Exterior walls take on a cool, semi-translucent dark slate shell
+   * so that the intensely glowing hot machine cores, volumetric heat auras,
+   * expanding radiant waves, and convective plumes visually dominate.
+   */
+  public setThermalMode(enabled: boolean) {
+    this.isThermalMode = enabled;
+
+    if (enabled) {
+      this.applyThermalMaterials();
+    } else {
+      if (this.isXRayMode) {
+        this.setXRayMode(true);
+      } else {
+        this.restoreNormalMaterials();
+      }
+    }
+  }
+
+  private applyThermalMaterials() {
+    this.materials.wallPanel.transparent = true;
+    this.materials.wallPanel.opacity = 0.26;
+    this.materials.wallPanel.depthWrite = false;
+    this.materials.wallPanel.color.set('#1E293B');
+    this.materials.wallPanel.metalness = 0.15;
+    this.materials.wallPanel.roughness = 0.45;
+
+    this.materials.roofDeck.transparent = true;
+    this.materials.roofDeck.opacity = 0.18;
+    this.materials.roofDeck.depthWrite = false;
+    this.materials.roofDeck.color.set('#0F172A');
+
+    this.materials.accentTrim.transparent = true;
+    this.materials.accentTrim.opacity = 0.50;
+    this.materials.accentTrim.depthWrite = false;
+    this.materials.accentTrim.color.set('#0F172A');
+
+    this.materials.windowGlass.opacity = 0.22;
+    this.materials.helideck.opacity = 0.25;
+    this.materials.helideck.transparent = true;
+
+    // Subtle ember/slate edge lines
+    this.edgeLineMat.color.set('#475569');
+    this.edgeLineMat.opacity = 0.40;
+  }
+
+  private restoreNormalMaterials() {
+    this.materials.wallPanel.transparent = false;
+    this.materials.wallPanel.opacity = 1.0;
+    this.materials.wallPanel.depthWrite = true;
+    this.materials.wallPanel.color.set('#E8EFF4');
+    this.materials.wallPanel.metalness = 0.25;
+    this.materials.wallPanel.roughness = 0.35;
+
+    this.materials.roofDeck.transparent = false;
+    this.materials.roofDeck.opacity = 1.0;
+    this.materials.roofDeck.depthWrite = true;
+    this.materials.roofDeck.color.set('#D2DCE4');
+
+    this.materials.accentTrim.transparent = false;
+    this.materials.accentTrim.opacity = 1.0;
+    this.materials.accentTrim.depthWrite = true;
+    this.materials.accentTrim.color.set('#004E64');
+
+    this.materials.windowGlass.opacity = 0.85;
+    this.materials.helideck.opacity = 1.0;
+    this.materials.helideck.transparent = false;
+
+    this.edgeLineMat.opacity = 0.0;
   }
 
   /**
@@ -557,5 +654,6 @@ export class StationBuilding {
 
   public dispose() {
     Object.values(this.materials).forEach((m) => m.dispose());
+    this.edgeLineMat.dispose();
   }
 }

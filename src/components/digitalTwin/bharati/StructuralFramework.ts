@@ -179,6 +179,31 @@ export class StructuralFramework {
     this.trussMeshes.push(brace);
   }
 
+  public setXRayMode(enabled: boolean) {
+    if (enabled) {
+      // Structural columns and trusses become visible at ~70% opacity in X-Ray mode
+      this.materials.steelStilt.transparent = true;
+      this.materials.steelStilt.opacity = 0.72;
+      this.materials.steelStilt.depthWrite = false;
+      this.materials.steelStilt.metalness = 0.95;
+
+      this.materials.steelTruss.transparent = true;
+      this.materials.steelTruss.opacity = 0.68;
+      this.materials.steelTruss.depthWrite = false;
+      this.materials.steelTruss.metalness = 0.90;
+    } else {
+      this.materials.steelStilt.transparent = false;
+      this.materials.steelStilt.opacity = 1.0;
+      this.materials.steelStilt.depthWrite = true;
+      this.materials.steelStilt.metalness = 0.8;
+
+      this.materials.steelTruss.transparent = false;
+      this.materials.steelTruss.opacity = 1.0;
+      this.materials.steelTruss.depthWrite = true;
+      this.materials.steelTruss.metalness = 0.75;
+    }
+  }
+
   public setHeatMapColor(hexColor: string | null) {
     if (!hexColor) {
       this.materials.steelStilt.color.set('#3A4854');

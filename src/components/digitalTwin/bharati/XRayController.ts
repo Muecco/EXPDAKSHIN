@@ -28,13 +28,7 @@ export class XRayController {
     this.active = enabled;
     this.building.setXRayMode(enabled);
     this.interior.setXRayMode(enabled);
-    if (enabled) {
-      this.structure.materials.steelStilt.metalness = 0.95;
-      this.structure.materials.steelTruss.metalness = 0.9;
-    } else {
-      this.structure.materials.steelStilt.metalness = 0.8;
-      this.structure.materials.steelTruss.metalness = 0.75;
-    }
+    this.structure.setXRayMode(enabled);
   }
 
   public isEnabled(): boolean {

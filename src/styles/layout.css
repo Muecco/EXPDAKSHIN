@@ -249,7 +249,7 @@
   overflow: hidden;
   pointer-events: none;
   user-select: none;
-  z-index: 1;
+  z-index: 2;
 }
 
 .landing-watermark-row {
@@ -266,34 +266,25 @@
 }
 
 .landing-watermark-track > span {
-  font-size: 20vw;
+  font-size: clamp(130px, 17vw, 240px);
   font-weight: 900;
   font-family: var(--font-heading);
   text-transform: uppercase;
-  line-height: 0.9;
-  letter-spacing: -0.04em;
-  color: transparent;
-  -webkit-text-stroke: 1px var(--deep-teal);
-  opacity: 0.045;
-  padding: 0 3vw;
+  line-height: 0.95;
+  letter-spacing: 0.04em;
+  color: rgba(0, 78, 100, 0.16);
+  text-shadow: 0 8px 32px rgba(0, 78, 100, 0.08);
+  padding: 0 3.5vw;
   display: inline-block;
-}
-
-.track-left {
-  animation: dakshinDriftLeft 90s linear infinite;
+  user-select: none;
 }
 
 .track-right {
-  animation: dakshinDriftRight 105s linear infinite;
+  animation: dakshinDriftRight 180s linear infinite;
 }
 
-@keyframes dakshinDriftLeft {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-  100% {
-    transform: translate3d(-100%, 0, 0);
-  }
+.track-right-slow {
+  animation: dakshinDriftRight 240s linear infinite;
 }
 
 @keyframes dakshinDriftRight {
@@ -305,30 +296,30 @@
   }
 }
 
-/* Second Antarctic Station Ghost Reveal Layer */
+/* High-Definition Station Spotlight Reveal Layer */
 .landing-station-reveal {
   position: absolute;
   inset: 0;
-  background-image: url(/assets/antarctic-station-reveal.jpg);
+  background-image: url(/images/bharati_station_new.jpg);
   background-size: cover;
-  background-position: center 30%;
+  background-position: center 40%;
   pointer-events: none;
   z-index: 4;
   opacity: 0;
-  transition: opacity 0.4s ease;
-  filter: contrast(110%) brightness(1.02) saturate(1.1);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  filter: contrast(125%) brightness(1.10) saturate(1.30);
   -webkit-mask-image: radial-gradient(
-    circle 260px at var(--reveal-x, -9999px) var(--reveal-y, -9999px),
-    rgba(0, 0, 0, 0.92) 0%,
-    rgba(0, 0, 0, 0.72) 35%,
-    rgba(0, 0, 0, 0.25) 65%,
+    circle 280px at var(--reveal-x, -9999px) var(--reveal-y, -9999px),
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.88) 32%,
+    rgba(0, 0, 0, 0.35) 65%,
     rgba(0, 0, 0, 0) 100%
   );
   mask-image: radial-gradient(
-    circle 260px at var(--reveal-x, -9999px) var(--reveal-y, -9999px),
-    rgba(0, 0, 0, 0.92) 0%,
-    rgba(0, 0, 0, 0.72) 35%,
-    rgba(0, 0, 0, 0.25) 65%,
+    circle 280px at var(--reveal-x, -9999px) var(--reveal-y, -9999px),
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.88) 32%,
+    rgba(0, 0, 0, 0.35) 65%,
     rgba(0, 0, 0, 0) 100%
   );
 }
@@ -342,14 +333,14 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 42px;
-  height: 42px;
-  margin-top: -21px;
-  margin-left: -21px;
+  width: 46px;
+  height: 46px;
+  margin-top: -23px;
+  margin-left: -23px;
   pointer-events: none;
   z-index: 50;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.35s ease;
   will-change: transform;
 }
 
@@ -362,8 +353,8 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 1px solid rgba(0, 78, 100, 0.35);
-  box-shadow: 0 0 10px rgba(0, 78, 100, 0.1), inset 0 0 6px rgba(0, 78, 100, 0.05);
+  border: 1.5px solid rgba(0, 180, 160, 0.55);
+  box-shadow: 0 0 14px rgba(0, 180, 160, 0.3), inset 0 0 8px rgba(0, 180, 160, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -372,36 +363,36 @@
 .hud-reticle::before {
   content: '';
   position: absolute;
-  inset: -3px;
+  inset: -4px;
   border-radius: 50%;
-  border: 1px dashed rgba(0, 78, 100, 0.25);
+  border: 1px dashed rgba(0, 215, 180, 0.4);
 }
 
 .hud-crosshair {
   position: relative;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
 }
 
 .hud-crosshair::before,
 .hud-crosshair::after {
   content: '';
   position: absolute;
-  background-color: rgba(0, 78, 100, 0.65);
+  background-color: rgba(0, 215, 180, 0.85);
 }
 
 .hud-crosshair::before {
-  top: 4.5px;
+  top: 5.5px;
   left: 0;
-  width: 10px;
+  width: 12px;
   height: 1px;
 }
 
 .hud-crosshair::after {
   top: 0;
-  left: 4.5px;
+  left: 5.5px;
   width: 1px;
-  height: 10px;
+  height: 12px;
 }
 
 /* Touch, Mobile & Reduced Motion Overrides */
@@ -413,12 +404,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .track-left,
-  .track-right {
+  .track-right,
+  .track-right-slow {
     animation: none !important;
   }
   .landing-cursor-hud {
     display: none !important;
   }
 }
+
 

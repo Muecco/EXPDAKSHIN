@@ -271,14 +271,32 @@ export class InteriorLayout {
 
   public setXRayMode(enabled: boolean) {
     // In X-Ray mode, internal walls become sharp and distinct with cyan/blue edge contrast
+    // and the intermediate floor becomes semi-translucent so lower-level machinery can be inspected
     if (enabled) {
       this.materials.interiorWall.color.set('#38BDF8');
-      this.materials.interiorWall.roughness = 0.3;
-      this.materials.deckFloor.color.set('#0F172A');
+      this.materials.interiorWall.roughness = 0.25;
+      this.materials.interiorWall.transparent = true;
+      this.materials.interiorWall.opacity = 0.88;
+
+      this.materials.deckFloor.color.set('#1E293B');
+      this.materials.deckFloor.transparent = true;
+      this.materials.deckFloor.opacity = 0.55;
+      this.materials.deckFloor.depthWrite = false;
+
+      this.materials.labBench.color.set('#0284C7');
+      this.materials.labBench.opacity = 1.0;
     } else {
       this.materials.interiorWall.color.set('#94A3B8');
       this.materials.interiorWall.roughness = 0.7;
+      this.materials.interiorWall.transparent = false;
+      this.materials.interiorWall.opacity = 1.0;
+
       this.materials.deckFloor.color.set('#475569');
+      this.materials.deckFloor.transparent = false;
+      this.materials.deckFloor.opacity = 1.0;
+      this.materials.deckFloor.depthWrite = true;
+
+      this.materials.labBench.color.set('#0284C7');
     }
   }
 

@@ -514,7 +514,7 @@ export const SimulationControlDrawer: React.FC = () => {
                               </div>
                             </div>
                             <button
-                              onClick={() => triggerScenario(sc.id)}
+                              onClick={() => (isActive ? resetSimulation() : triggerScenario(sc.id))}
                               style={{
                                 padding: '0.35rem 0.75rem',
                                 borderRadius: '4px',
@@ -583,7 +583,7 @@ export const SimulationControlDrawer: React.FC = () => {
                               </div>
                             </div>
                             <button
-                              onClick={() => triggerScenario(sc.id)}
+                              onClick={() => (isActive ? resetSimulation() : triggerScenario(sc.id))}
                               style={{
                                 padding: '0.35rem 0.75rem',
                                 borderRadius: '4px',
@@ -652,7 +652,7 @@ export const SimulationControlDrawer: React.FC = () => {
                               </div>
                             </div>
                             <button
-                              onClick={() => triggerScenario(sc.id)}
+                              onClick={() => (isActive ? resetSimulation() : triggerScenario(sc.id))}
                               style={{
                                 padding: '0.35rem 0.75rem',
                                 borderRadius: '4px',
