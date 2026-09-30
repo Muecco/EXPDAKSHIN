@@ -4,14 +4,9 @@ import {
   Bot,
   Send,
   X,
-  Sparkles,
-  ShieldCheck,
   FileText,
   Key,
   RefreshCw,
-  ExternalLink,
-  ChevronRight,
-  AlertTriangle,
   CheckCircle2,
 } from 'lucide-react';
 import { useStation } from '../../context/StationContext';
@@ -126,11 +121,11 @@ export const RagCopilotDrawer: React.FC<RagCopilotDrawerProps> = ({ isOpen, onCl
   const [isLoading, setIsLoading] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showKeyModal, setShowKeyModal] = useState(false);
-  const [activeKey, setActiveKey] = useState(getGeminiApiKey());
+  const [_activeKey, setActiveKey] = useState(getGeminiApiKey());
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setActiveKey(getGeminiApiKey());
+    setActiveKey(getGeminiApiKey());  // refresh key status when drawer opens
   }, [isOpen]);
 
   useEffect(() => {
@@ -154,7 +149,7 @@ export const RagCopilotDrawer: React.FC<RagCopilotDrawerProps> = ({ isOpen, onCl
 
     try {
       const telemetryContext = selectedStation
-        ? `Station ID: ${selectedStation.id}, Name: ${selectedStation.name}, Location: ${selectedStation.location}`
+        ? `Station ID: ${selectedStation.id}, Name: ${selectedStation.name}, Location: ${selectedStation.configuredLocation}`
         : 'Maitri & Bharati Telemetry Active';
 
       const response: RagResponse = await queryGeminiRag(query, selectedStation?.id || 'maitri', telemetryContext);
