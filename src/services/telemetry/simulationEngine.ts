@@ -627,6 +627,63 @@ export class SimulationEngine {
     const def = SIMULATION_SCENARIOS[scenarioId];
     const timeStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+    // Immediately apply scenario-specific primary physical perturbation so changes are instantaneous
+    if (scenarioId === 'EXTREME_COLD') {
+      s.currentAtmospheric.temperature = -46.5;
+      s.currentAtmospheric.weather_state = 'HEAVY_SNOW';
+      s.currentAtmospheric.wind_speed = 19.5;
+    } else if (scenarioId === 'BLIZZARD' || scenarioId === 'ANTARCTIC_EXTREME_EVENT') {
+      s.currentAtmospheric.temperature = -45.0;
+      s.currentAtmospheric.weather_state = 'BLIZZARD';
+      s.currentAtmospheric.wind_speed = 38.0;
+    } else if (scenarioId === 'HIGH_WIND') {
+      s.currentAtmospheric.wind_speed = 28.5;
+    } else if (scenarioId === 'GENERATOR_VIBRATION' || scenarioId === 'MULTI_ASSET_DEGRADATION') {
+      s.assetStates['GEN-01'].vib = 6.4;
+      s.assetStates['GEN-01'].temp = 86.5;
+    } else if (scenarioId === 'GENERATOR_OVERHEAT') {
+      s.assetStates['GEN-01'].temp = 98.4;
+    } else if (scenarioId === 'GENERATOR_OVERLOAD' || scenarioId === 'CASCADING_LOAD_EVENT') {
+      s.assetStates['GEN-01'].curr = 97.5;
+      s.assetStates['GEN-01'].eff = 72.0;
+    } else if (scenarioId === 'PUMP_DEGRADATION') {
+      s.assetStates['PUMP-01'].eff = 67.0;
+      s.assetStates['PUMP-01'].vib = 5.6;
+    } else if (scenarioId === 'HEATER_FAILURE') {
+      s.assetStates['HEATER-01'].temp = 7.8;
+      s.assetStates['HEATER-01'].eff = 32.0;
+      s.assetStates['HEATER-01'].status = 'FAILED';
+    } else if (scenarioId === 'BATTERY_LOW') {
+      s.assetStates['BAT-01'].fuel = 14.5;
+    }
+
+    // Immediately calculate coupling physics
+    const tempDelta = Math.max(0, -20.0 - s.currentAtmospheric.temperature);
+    const heatingDemand = Math.min(100, 50.0 + tempDelta * 1.5);
+    const stationElectricalLoad = Math.min(220, 110.0 + (heatingDemand / 100) * 85.0);
+    const gen1LoadPct = Math.min(100, (stationElectricalLoad / 180.0) * 100);
+    const fuelRate = 22.0 + (gen1LoadPct / 100) * 16.0;
+    const stressIndex = Math.min(100, Math.max(10, (gen1LoadPct - 50) * 1.8 + (tempDelta > 20 ? 25 : 0)));
+
+    s.coupling = {
+      outside_temp: s.currentAtmospheric.temperature,
+      heating_demand_pct: Number(heatingDemand.toFixed(1)),
+      station_electrical_load_kw: Number(stationElectricalLoad.toFixed(1)),
+      generator_load_pct: Number(gen1LoadPct.toFixed(1)),
+      total_fuel_consumption_rate: Number(fuelRate.toFixed(1)),
+      machinery_stress_index: Number(stressIndex.toFixed(1)),
+      overall_risk_score: Math.round(stressIndex * 0.8),
+      active_coupling_text:
+        tempDelta > 25
+          ? 'CRITICAL COUPLING: Severe polar cold is demanding 90%+ heating, driving GEN-01 near maximum continuous capacity.'
+          : tempDelta > 12
+          ? 'ELEVATED COUPLING: Low temperatures driving heating demand above nominal baseline.'
+          : 'NOMINAL COUPLING: Balanced load-thermal equilibrium.',
+    };
+
+    // Evaluate alerts immediately
+    this.evaluateAlerts(stationId);
+
     // Add scenario trigger to timeline
     s.timeline.unshift({
       event_id: `evt-${Date.now()}`,

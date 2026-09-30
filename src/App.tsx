@@ -10,11 +10,11 @@ import { MachineryPage } from './pages/Machinery/MachineryPage';
 import { AlertsPage } from './pages/Alerts/AlertsPage';
 import { AnalyticsPage } from './pages/Analytics/AnalyticsPage';
 import { SimulationControlDrawer } from './components/simulation/SimulationControlDrawer';
+import { SettingsPage } from './pages/Settings/SettingsPage';
 import { SectionPlaceholder } from './pages/SectionPlaceholder';
 import {
   MountainSnow,
   Wrench,
-  SlidersHorizontal,
 } from 'lucide-react';
 import type { StationId } from './types';
 
@@ -124,13 +124,7 @@ const MainApplication: React.FC = () => {
         )}
 
         {currentRoute === '/settings' && (
-          <SectionPlaceholder
-            sectionId="settings"
-            title="Station & Link Settings"
-            subtitle="Edge connection parameters, telemetry streaming frequencies, role-based access control, and simulator toggles."
-            icon={SlidersHorizontal}
-            onNavigate={handleRouteChange}
-          />
+          <SettingsPage onNavigate={handleRouteChange} />
         )}
       </main>
 

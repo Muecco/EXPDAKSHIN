@@ -10,6 +10,10 @@ import { UtilityNetwork } from './UtilityNetwork';
 import { SensorMarkers } from './SensorMarkers';
 import { XRayController } from './XRayController';
 import { HeatMapController } from './HeatMapController';
+import { BharatiSite } from './BharatiSite';
+import { ThermalRadiationSystem } from '../station/ThermalRadiationSystem';
+import { BHARATI_LAYOUT } from '../station/layouts/bharatiLayout';
+import type { OperationalStatus } from '../../../types';
 
 /**
  * BharatiStation
@@ -30,9 +34,15 @@ export class BharatiStation {
 
   public xray: XRayController;
   public heatmap: HeatMapController;
+  /** Coastal site context (Prydz Bay sea, shoreline, container yards, helipad). */
+  public site: BharatiSite;
+  /** Heat actually radiating from this station's machinery (thermal mode). */
+  public thermal: ThermalRadiationSystem;
 
   private currentVisionMode: VisionMode = 'NORMAL';
   private selectedAssetId: string | null = null;
+  /** Last known live status per asset, so heat-map tinting can be undone. */
+  private lastStatus: Map<string, OperationalStatus> = new Map();
 
   constructor() {
     this.rootGroup = new THREE.Group();
@@ -62,7 +72,18 @@ export class BharatiStation {
     this.sensors = new SensorMarkers();
     this.rootGroup.add(this.sensors.group);
 
-    // 7. Mode Controllers
+    // 7. Coastal site context (sea, shoreline, container yards, helipad)
+    this.site = new BharatiSite();
+    this.rootGroup.add(this.site.group);
+
+    // 8. Thermal radiation sources (data-driven from the layout manifest)
+    this.thermal = new ThermalRadiationSystem(
+      'Bharati_ThermalRadiation',
+      BHARATI_LAYOUT.thermalSources
+    );
+    this.rootGroup.add(this.thermal.group);
+
+    // 9. Mode Controllers
     this.xray = new XRayController(this.building, this.interior, this.structure);
     this.heatmap = new HeatMapController(this.building, this.structure, this.equipment);
 
@@ -76,63 +97,83 @@ export class BharatiStation {
   public initializeTelemetry(assets: Record<MachineAssetId, MachineTelemetry>) {
     this.equipment.initializeEquipment(assets);
     this.sensors.initializeMarkers(assets);
+    (Object.keys(assets) as MachineAssetId[]).forEach((id) => this.lastStatus.set(id, assets[id].status));
   }
 
   /**
    * Switch Vision Mode: NORMAL, XRAY, CONNECTIVITY, or HEAT_MAP
    */
-  public setVisionMode(mode: VisionMode, metric?: HeatMapMetric, assets?: Record<string, TelemetryUpdateItem>, atmospheric?: AtmosphericTelemetry) {
+  public setVisionMode(mode: VisionMode, _metric?: HeatMapMetric, assets?: Record<string, TelemetryUpdateItem>, atmospheric?: AtmosphericTelemetry) {
     this.currentVisionMode = mode;
 
     switch (mode) {
       case 'NORMAL':
+        this.building.setThermalMode(false);
+        this.equipment.setThermalMode(false);
         this.xray.setEnabled(false);
-        this.heatmap.clear();
+        this.clearHeatMap();
         this.utility.setVisibility(false);
         this.sensors.setVisibility(true);
         break;
 
       case 'XRAY':
+        this.building.setThermalMode(false);
+        this.equipment.setThermalMode(false);
         this.xray.setEnabled(true);
-        this.heatmap.clear();
+        this.clearHeatMap();
+        // In X-Ray mode, internal pipelines and machinery are 100% visible inside the transparent station
         this.utility.setVisibility(true);
+        this.utility.highlightAssetConnections(null);
         this.sensors.setVisibility(true);
         break;
 
       case 'CONNECTIVITY':
-        // In connectivity mode, make shell translucent so all pipeline links are visible
+        this.building.setThermalMode(false);
+        this.equipment.setThermalMode(false);
+        // See-through walls so every pipeline link is visible in situ
         this.xray.setEnabled(true);
-        this.heatmap.clear();
+        this.clearHeatMap();
         this.utility.setVisibility(true);
         this.utility.highlightAssetConnections(this.selectedAssetId);
         this.sensors.setVisibility(true);
         break;
 
       case 'HEAT_MAP':
+        // THERMAL RADIATION mode — heat visibly emanates from the machines
+        // themselves (hot core + aura + ground field + travelling heat waves + plumes)
         this.xray.setEnabled(false);
+        this.building.setThermalMode(true);
+        this.equipment.setThermalMode(true);
         this.utility.setVisibility(false);
         this.sensors.setVisibility(true);
-        if (metric && assets) {
-          const temp = atmospheric?.temperature ?? -31.8;
-          const wind = atmospheric?.wind_speed ?? 18.0;
-          this.heatmap.applyMetric(metric, assets, temp, wind);
-        }
+        this.heatmap.clear();
+        this.thermal.setModeProgress(1);
+        this.thermal.applyTelemetry(assets ?? {}, atmospheric?.temperature ?? -31.8);
         break;
     }
+  }
+
+  private clearHeatMap(): void {
+    this.thermal.setModeProgress(0);
+    this.building.setThermalMode(false);
+    this.equipment.setThermalMode(false);
+    this.heatmap.clear();
+    this.equipment.assetMaterials.forEach((_m, assetId) => {
+      this.equipment.updateAssetStatus(assetId, this.lastStatus.get(assetId) ?? 'NORMAL');
+    });
   }
 
   /**
    * Sets heat map metric while in HEAT_MAP mode
    */
   public setHeatMapMetric(
-    metric: HeatMapMetric,
+    _metric: HeatMapMetric,
     assets: Record<string, TelemetryUpdateItem>,
     atmospheric?: AtmosphericTelemetry
   ) {
     if (this.currentVisionMode === 'HEAT_MAP') {
-      const temp = atmospheric?.temperature ?? -31.8;
-      const wind = atmospheric?.wind_speed ?? 18.0;
-      this.heatmap.applyMetric(metric, assets, temp, wind);
+      // Emission is data-driven from live machine temperature
+      this.thermal.applyTelemetry(assets, atmospheric?.temperature ?? -31.8);
     }
   }
 
@@ -155,15 +196,14 @@ export class BharatiStation {
     atmospheric?: AtmosphericTelemetry
   ) {
     Object.values(assets).forEach((asset) => {
+      this.lastStatus.set(asset.asset_id, asset.status);
       this.equipment.updateAssetStatus(asset.asset_id, asset.status);
       this.sensors.updateStatus(asset.asset_id, asset.status);
     });
 
     if (this.currentVisionMode === 'HEAT_MAP') {
-      const metric = this.heatmap.getActiveMetric();
-      const temp = atmospheric?.temperature ?? -31.8;
-      const wind = atmospheric?.wind_speed ?? 18.0;
-      this.heatmap.applyMetric(metric, assets, temp, wind);
+      // Re-derive every machine's heat emission from the live plant state
+      this.thermal.applyTelemetry(assets, atmospheric?.temperature ?? -31.8);
     }
   }
 
@@ -174,6 +214,8 @@ export class BharatiStation {
     if (this.currentVisionMode === 'CONNECTIVITY' || this.currentVisionMode === 'XRAY') {
       this.utility.update(dt);
     }
+    this.thermal.update(dt, time);
+    this.site.update(dt, time);
     this.sensors.update(time);
   }
 
@@ -181,7 +223,22 @@ export class BharatiStation {
     return this.currentVisionMode;
   }
 
+  /**
+   * Asset mesh registry, keyed by asset id. Required by the shared station twin
+   * contract so DigitalTwinPanel can register raycast targets generically.
+   */
+  public getAssetGroups(): Map<string, THREE.Group> {
+    return this.equipment.assetGroups;
+  }
+
+  /** Number of configured thermal emitters (UI provenance). */
+  public getThermalSourceCount(): number {
+    return this.thermal.getSourceCount();
+  }
+
   public dispose() {
+    this.thermal.dispose();
+    this.site.dispose();
     this.structure.dispose();
     this.building.dispose();
     this.interior.dispose();

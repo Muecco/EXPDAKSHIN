@@ -56,8 +56,8 @@ interface SimulationContextType {
 const SimulationContext = createContext<SimulationContextType | undefined>(undefined);
 
 export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { selectedStationId } = useStation();
-  const activeStationId = selectedStationId || 'maitri';
+  const { selectedStationId, selectedStation } = useStation();
+  const activeStationId = selectedStation?.id || selectedStationId || 'bharati';
 
   // Tick state triggers reactive re-renders when engine updates
   const [, setTick] = useState<number>(0);
@@ -84,11 +84,7 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return Math.max(20, Math.min(100, Math.round(100 - avgRisk * 0.75)));
   }, [machineryAssets]);
 
-  const activeScenario = useMemo(() => {
-    const s = (simulationEngine as any).stationStates?.[activeStationId]?.activeScenario;
-    return (s as ScenarioId) || null;
-  }, [activeStationId]);
-
+  const activeScenario = ((simulationEngine as any).stationStates?.[activeStationId]?.activeScenario as ScenarioId) || null;
   const activeScenarioDef = activeScenario ? SIMULATION_SCENARIOS[activeScenario] || null : null;
   const availableScenarios = useMemo(() => Object.values(SIMULATION_SCENARIOS), []);
 

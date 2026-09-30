@@ -84,27 +84,27 @@ export class AntarcticWeatherSystem {
   private scene: THREE.Scene;
   private weatherGroup: THREE.Group;
 
-  // 1. Falling Snow
+  // 1. Falling Snow (covers the entire visible 3D plane)
   private snowPoints: THREE.Points;
   private snowPositions: Float32Array;
   private snowVelocities: Float32Array;
   private snowFlutters: Float32Array;
   private snowMaterial: THREE.PointsMaterial;
-  private readonly numSnow = 2400;
+  private readonly numSnow = 4200;
 
   // 2. Crystal Snowflakes
   private crystalPoints: THREE.Points;
   private crystalPositions: Float32Array;
   private crystalVelocities: Float32Array;
   private crystalMaterial: THREE.PointsMaterial;
-  private readonly numCrystals = 120;
+  private readonly numCrystals = 220;
 
   // 3. Low-Level Ground Blowing Snow
   private groundDriftPoints: THREE.Points;
   private groundDriftPositions: Float32Array;
   private groundDriftVelocities: Float32Array;
   private groundDriftMaterial: THREE.PointsMaterial;
-  private readonly numGroundDrift = 550;
+  private readonly numGroundDrift = 750;
 
   // 4. Wind Flow Streaks (Ribbons)
   private windLines: THREE.LineSegments;
@@ -130,17 +130,19 @@ export class AntarcticWeatherSystem {
     const snowTex = createSnowflakeTexture();
     const crystalTex = createCrystalTexture();
 
-    // ── 1. Setup Falling Snow ───────────────────────────────────────────────
+    // ── 1. Setup Falling Snow across the entire 3D plane ────────────────────
     this.snowPositions = new Float32Array(this.numSnow * 3);
     this.snowVelocities = new Float32Array(this.numSnow);
     this.snowFlutters = new Float32Array(this.numSnow);
 
     for (let i = 0; i < this.numSnow; i++) {
-      this.snowPositions[i * 3] = (Math.random() - 0.5) * 56;
-      this.snowPositions[i * 3 + 1] = Math.random() * 25 + 0.1;
-      this.snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 56;
+      // Spread across the entire visible 3D platform (in front of and behind station)
+      this.snowPositions[i * 3] = (Math.random() - 0.5) * 260;
+      this.snowPositions[i * 3 + 1] = Math.random() * 32 + 0.1;
+      this.snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 260;
 
-      this.snowVelocities[i] = 1.2 + Math.random() * 1.6; // fall speed
+      // Varied fall speeds and flutter cycles
+      this.snowVelocities[i] = 1.0 + Math.random() * 2.2;
       this.snowFlutters[i] = Math.random() * Math.PI * 2;
     }
 
@@ -148,15 +150,13 @@ export class AntarcticWeatherSystem {
     snowGeo.setAttribute('position', new THREE.BufferAttribute(this.snowPositions, 3));
 
     this.snowMaterial = new THREE.PointsMaterial({
-      // Pale blue-white tint so flakes are visible against the bright snow ground
-      color: '#D6E8F5',
-      size: 0.38,
+      // Pale blue-white tint for crisp contrast against terrain and dark background
+      color: '#E0F0FC',
+      size: 0.42,
       map: snowTex,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.75,
       depthWrite: false,
-      // AdditiveBlending: particles accumulate brightness — foreground clusters
-      // appear brighter naturally, giving depth without manual z-sorting
       blending: THREE.AdditiveBlending,
       sizeAttenuation: true,
     });
@@ -168,19 +168,19 @@ export class AntarcticWeatherSystem {
     this.crystalVelocities = new Float32Array(this.numCrystals);
 
     for (let i = 0; i < this.numCrystals; i++) {
-      this.crystalPositions[i * 3] = (Math.random() - 0.5) * 50;
-      this.crystalPositions[i * 3 + 1] = Math.random() * 24 + 0.5;
-      this.crystalPositions[i * 3 + 2] = (Math.random() - 0.5) * 50;
+      this.crystalPositions[i * 3] = (Math.random() - 0.5) * 220;
+      this.crystalPositions[i * 3 + 1] = Math.random() * 30 + 0.5;
+      this.crystalPositions[i * 3 + 2] = (Math.random() - 0.5) * 220;
 
-      this.crystalVelocities[i] = 0.8 + Math.random() * 1.0;
+      this.crystalVelocities[i] = 0.8 + Math.random() * 1.2;
     }
 
     const crystalGeo = new THREE.BufferGeometry();
     crystalGeo.setAttribute('position', new THREE.BufferAttribute(this.crystalPositions, 3));
 
     this.crystalMaterial = new THREE.PointsMaterial({
-      color: '#C8E0F4',
-      size: 0.92,
+      color: '#D4E9F8',
+      size: 0.95,
       map: crystalTex,
       transparent: true,
       opacity: 0.82,
@@ -196,23 +196,22 @@ export class AntarcticWeatherSystem {
     this.groundDriftVelocities = new Float32Array(this.numGroundDrift);
 
     for (let i = 0; i < this.numGroundDrift; i++) {
-      this.groundDriftPositions[i * 3] = (Math.random() - 0.5) * 52;
-      this.groundDriftPositions[i * 3 + 1] = 0.05 + Math.random() * 1.5; // ground hugging
-      this.groundDriftPositions[i * 3 + 2] = (Math.random() - 0.5) * 52;
+      this.groundDriftPositions[i * 3] = (Math.random() - 0.5) * 200;
+      this.groundDriftPositions[i * 3 + 1] = 0.05 + Math.random() * 1.8;
+      this.groundDriftPositions[i * 3 + 2] = (Math.random() - 0.5) * 200;
 
-      this.groundDriftVelocities[i] = 1.0 + Math.random() * 1.2;
+      this.groundDriftVelocities[i] = 1.0 + Math.random() * 1.3;
     }
 
     const groundDriftGeo = new THREE.BufferGeometry();
     groundDriftGeo.setAttribute('position', new THREE.BufferAttribute(this.groundDriftPositions, 3));
 
     this.groundDriftMaterial = new THREE.PointsMaterial({
-      // Slightly more blue-grey for ground-level blowing snow
       color: '#B8D0E8',
-      size: 0.30,
+      size: 0.32,
       map: snowTex,
       transparent: true,
-      opacity: 0.52,
+      opacity: 0.55,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       sizeAttenuation: true,
@@ -221,16 +220,15 @@ export class AntarcticWeatherSystem {
     this.weatherGroup.add(this.groundDriftPoints);
 
     // ── 4. Setup Animated Wind Flow Streaks ─────────────────────────────────
-    // Each streak has segsPerStreak segments (2 vertices per segment = 2 * segsPerStreak * 3 floats)
     const totalLineVertices = this.numStreaks * this.segsPerStreak * 2;
     this.windPositions = new Float32Array(totalLineVertices * 3);
     this.windAnchors = new Float32Array(this.numStreaks * 3);
     this.windPhases = new Float32Array(this.numStreaks);
 
     for (let s = 0; s < this.numStreaks; s++) {
-      this.windAnchors[s * 3] = (Math.random() - 0.5) * 44;
-      this.windAnchors[s * 3 + 1] = 1.0 + Math.random() * 7.5; // air levels
-      this.windAnchors[s * 3 + 2] = (Math.random() - 0.5) * 44;
+      this.windAnchors[s * 3] = (Math.random() - 0.5) * 90;
+      this.windAnchors[s * 3 + 1] = 1.0 + Math.random() * 10.0;
+      this.windAnchors[s * 3 + 2] = (Math.random() - 0.5) * 90;
       this.windPhases[s] = Math.random() * 50;
     }
 
@@ -238,7 +236,6 @@ export class AntarcticWeatherSystem {
     windGeo.setAttribute('position', new THREE.BufferAttribute(this.windPositions, 3));
 
     this.windMaterial = new THREE.LineBasicMaterial({
-      // Ice-blue tint so wind streaks contrast against both bright snow and grey sky
       color: '#A8CCE8',
       transparent: true,
       opacity: 0.38,
@@ -254,7 +251,6 @@ export class AntarcticWeatherSystem {
    * Driven by requestAnimationFrame in DigitalTwinPanel
    */
   public update(dt: number, weather: WeatherCondition) {
-    // Clamp delta time to avoid large jumps during tab-switching
     const delta = Math.min(dt, 0.08);
 
     // Wind direction unit vectors
@@ -262,8 +258,6 @@ export class AntarcticWeatherSystem {
     const dirX = Math.sin(windRad);
     const dirZ = Math.cos(windRad);
 
-    // Wind speed displacement factor
-    // 0-5 m/s: subtle; 10-20 m/s: clear diagonal; 30+ m/s: severe horizontal whipping
     const windSpeedFactor = (weather.windSpeed / 12);
     const hSpeed = windSpeedFactor * 6.5;
 
@@ -279,35 +273,33 @@ export class AntarcticWeatherSystem {
       // Vertical fall
       pos[idx + 1] -= (baseFall * vels[i]) * delta;
 
-      // Horizontal wind displacement + subtle flutter
-      flutters[i] += delta * 3.0;
-      const flutterX = Math.sin(flutters[i]) * 0.2;
-      const flutterZ = Math.cos(flutters[i]) * 0.2;
+      // Horizontal wind displacement + subtle natural flutter
+      flutters[i] += delta * 2.8;
+      const flutterX = Math.sin(flutters[i]) * 0.25;
+      const flutterZ = Math.cos(flutters[i]) * 0.25;
 
       pos[idx] += (dirX * hSpeed + flutterX) * delta;
       pos[idx + 2] += (dirZ * hSpeed + flutterZ) * delta;
 
-      // Recycle when reaching ground or outer volume
+      // Recycle when reaching ground or outer volume (extended across entire plane)
       if (
         pos[idx + 1] < 0.1 ||
-        pos[idx] > 30 ||
-        pos[idx] < -30 ||
-        pos[idx + 2] > 30 ||
-        pos[idx + 2] < -30
+        pos[idx] > 130 ||
+        pos[idx] < -130 ||
+        pos[idx + 2] > 130 ||
+        pos[idx + 2] < -130
       ) {
-        pos[idx + 1] = 24.0 + Math.random() * 2.5;
-        // Spawn upstream relative to wind so snowfall naturally enters from the windward side
-        pos[idx] = (Math.random() - 0.5) * 54 - dirX * 10;
-        pos[idx + 2] = (Math.random() - 0.5) * 54 - dirZ * 10;
+        pos[idx + 1] = 28.0 + Math.random() * 3.5;
+        // Spawn upstream relative to wind so snowfall enters naturally from windward side
+        pos[idx] = (Math.random() - 0.5) * 250 - dirX * 18;
+        pos[idx + 2] = (Math.random() - 0.5) * 250 - dirZ * 18;
       }
     }
     this.snowPoints.geometry.attributes.position.needsUpdate = true;
 
-    // Adjust snow material opacity and size according to intensity
-    // Min opacity kept higher (0.18) so flakes stay visible even in CLEAR weather
-    this.snowMaterial.opacity = Math.max(0.18, Math.min(0.88, weather.snowIntensity * 0.88));
-    // Size grows with intensity: heavier storms produce larger, more visible flakes
-    this.snowMaterial.size = 0.30 + weather.snowIntensity * 0.25;
+    // Keep snowfall clearly visible in all conditions across the whole environment
+    this.snowMaterial.opacity = Math.max(0.40, Math.min(0.92, 0.35 + weather.snowIntensity * 0.55));
+    this.snowMaterial.size = 0.36 + weather.snowIntensity * 0.22;
 
     // ── 2. Update Crystal Snowflakes ────────────────────────────────────────
     const cPos = this.crystalPositions;
@@ -319,14 +311,14 @@ export class AntarcticWeatherSystem {
       cPos[idx] += (dirX * hSpeed * 0.8) * delta;
       cPos[idx + 2] += (dirZ * hSpeed * 0.8) * delta;
 
-      if (cPos[idx + 1] < 0.2 || Math.abs(cPos[idx]) > 28 || Math.abs(cPos[idx + 2]) > 28) {
-        cPos[idx + 1] = 23.0 + Math.random() * 2.0;
-        cPos[idx] = (Math.random() - 0.5) * 48 - dirX * 8;
-        cPos[idx + 2] = (Math.random() - 0.5) * 48 - dirZ * 8;
+      if (cPos[idx + 1] < 0.2 || Math.abs(cPos[idx]) > 110 || Math.abs(cPos[idx + 2]) > 110) {
+        cPos[idx + 1] = 27.0 + Math.random() * 3.0;
+        cPos[idx] = (Math.random() - 0.5) * 210 - dirX * 14;
+        cPos[idx + 2] = (Math.random() - 0.5) * 210 - dirZ * 14;
       }
     }
     this.crystalPoints.geometry.attributes.position.needsUpdate = true;
-    this.crystalMaterial.opacity = Math.max(0.12, Math.min(0.88, weather.snowIntensity * 0.82));
+    this.crystalMaterial.opacity = Math.max(0.30, Math.min(0.85, 0.25 + weather.snowIntensity * 0.60));
 
     // ── 3. Update Low-Level Ground Blowing Snow ──────────────────────────────
     const gPos = this.groundDriftPositions;
@@ -338,11 +330,11 @@ export class AntarcticWeatherSystem {
       gPos[idx] += (dirX * groundSpeed * gVels[i]) * delta;
       gPos[idx + 2] += (dirZ * groundSpeed * gVels[i]) * delta;
 
-      // Wrap ground drift
-      if (Math.abs(gPos[idx]) > 28 || Math.abs(gPos[idx + 2]) > 28) {
-        gPos[idx] = (Math.random() - 0.5) * 50 - dirX * 16;
-        gPos[idx + 1] = 0.05 + Math.random() * 1.4;
-        gPos[idx + 2] = (Math.random() - 0.5) * 50 - dirZ * 16;
+      // Wrap ground drift across full terrain
+      if (Math.abs(gPos[idx]) > 105 || Math.abs(gPos[idx + 2]) > 105) {
+        gPos[idx] = (Math.random() - 0.5) * 190 - dirX * 18;
+        gPos[idx + 1] = 0.05 + Math.random() * 1.8;
+        gPos[idx + 2] = (Math.random() - 0.5) * 190 - dirZ * 18;
       }
     }
     this.groundDriftPoints.geometry.attributes.position.needsUpdate = true;

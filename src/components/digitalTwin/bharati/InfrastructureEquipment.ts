@@ -520,6 +520,39 @@ export class InfrastructureEquipment {
     }
   }
 
+  /**
+   * Toggles Thermal Radiation Mode for the machinery:
+   * Sets emissive glowing cores on heat-generating equipment (generators, heaters, pumps)
+   * so they visually radiate active thermal energy from their positions.
+   */
+  public setThermalMode(enabled: boolean) {
+    if (enabled) {
+      const thermalConfig: Record<string, { color: string; emissive: string; intensity: number }> = {
+        'GEN-01': { color: '#EF4444', emissive: '#F97316', intensity: 1.4 },
+        'GEN-02': { color: '#EF4444', emissive: '#F97316', intensity: 1.4 },
+        'HEATER-01': { color: '#F97316', emissive: '#FBBF24', intensity: 1.2 },
+        'PUMP-01': { color: '#F59E0B', emissive: '#FCD34D', intensity: 0.85 },
+        'BAT-01': { color: '#B45309', emissive: '#F59E0B', intensity: 0.6 },
+        'FUEL-01': { color: '#475569', emissive: '#334155', intensity: 0.1 },
+        'ENV-01': { color: '#0284C7', emissive: '#38BDF8', intensity: 0.2 },
+      };
+
+      this.assetMaterials.forEach((mat, assetId) => {
+        const cfg = thermalConfig[assetId];
+        if (cfg) {
+          mat.color.set(cfg.color);
+          mat.emissive.set(cfg.emissive);
+          mat.emissiveIntensity = cfg.intensity;
+        }
+      });
+    } else {
+      this.assetMaterials.forEach((_mat, assetId) => {
+        const telemetry = this.assetTelemetryData.get(assetId);
+        this.updateAssetStatus(assetId, telemetry?.status || 'NORMAL');
+      });
+    }
+  }
+
   public dispose() {
     this.assetMaterials.forEach((m) => m.dispose());
   }

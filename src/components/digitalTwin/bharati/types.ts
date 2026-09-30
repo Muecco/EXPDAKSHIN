@@ -19,7 +19,7 @@ export type CameraPresetId =
 export interface UtilityRoute {
   id: string;
   name: string;
-  type: 'power' | 'glycol' | 'water' | 'fuel' | 'comms';
+  type: 'power' | 'glycol' | 'water' | 'fuel' | 'comms' | 'wastewater' | 'air';
   color: string;
   points: [number, number, number][];
   diameter: number;

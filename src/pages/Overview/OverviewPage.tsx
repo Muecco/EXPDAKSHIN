@@ -216,7 +216,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }}>TEST SCENARIOS:</span>
             <button
-              onClick={() => triggerScenario('EXTREME_COLD')}
+              onClick={() => (activeScenario === 'EXTREME_COLD' ? resetSimulation() : triggerScenario('EXTREME_COLD'))}
               style={{
                 fontSize: '0.68rem',
                 fontWeight: 800,
@@ -231,10 +231,10 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 gap: '0.25rem',
               }}
             >
-              <Play size={10} /> EXTREME COLD
+              <Play size={10} /> {activeScenario === 'EXTREME_COLD' ? 'COLD ACTIVE' : 'EXTREME COLD'}
             </button>
             <button
-              onClick={() => triggerScenario('GENERATOR_VIBRATION')}
+              onClick={() => (activeScenario === 'GENERATOR_VIBRATION' ? resetSimulation() : triggerScenario('GENERATOR_VIBRATION'))}
               style={{
                 fontSize: '0.68rem',
                 fontWeight: 800,
@@ -249,10 +249,10 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 gap: '0.25rem',
               }}
             >
-              <Play size={10} /> GEN VIBRATION
+              <Play size={10} /> {activeScenario === 'GENERATOR_VIBRATION' ? 'VIB ACTIVE' : 'GEN VIBRATION'}
             </button>
             <button
-              onClick={() => triggerScenario('BLIZZARD')}
+              onClick={() => (activeScenario === 'BLIZZARD' ? resetSimulation() : triggerScenario('BLIZZARD'))}
               style={{
                 fontSize: '0.68rem',
                 fontWeight: 800,
@@ -267,7 +267,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 gap: '0.25rem',
               }}
             >
-              <Play size={10} /> BLIZZARD
+              <Play size={10} /> {activeScenario === 'BLIZZARD' ? 'BLIZZARD ACTIVE' : 'BLIZZARD'}
             </button>
             <button
               onClick={resetSimulation}

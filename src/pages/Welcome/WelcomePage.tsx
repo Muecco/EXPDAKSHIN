@@ -48,10 +48,27 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onSelectStation }) => 
         currentClientX = targetClientX;
         currentClientY = targetClientY;
       } else {
-        currentX += (targetX - currentX) * factor;
-        currentY += (targetY - currentY) * factor;
-        currentClientX += (targetClientX - currentClientX) * factor;
-        currentClientY += (targetClientY - currentClientY) * factor;
+        const dx = targetX - currentX;
+        const dy = targetY - currentY;
+        const dcx = targetClientX - currentClientX;
+        const dcy = targetClientY - currentClientY;
+
+        if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1 && Math.abs(dcx) < 0.1 && Math.abs(dcy) < 0.1) {
+          currentX = targetX;
+          currentY = targetY;
+          currentClientX = targetClientX;
+          currentClientY = targetClientY;
+          reveal.style.setProperty('--reveal-x', `${currentX.toFixed(1)}px`);
+          reveal.style.setProperty('--reveal-y', `${currentY.toFixed(1)}px`);
+          hud.style.transform = `translate3d(${currentClientX.toFixed(1)}px, ${currentClientY.toFixed(1)}px, 0)`;
+          rafId = null;
+          return;
+        }
+
+        currentX += dx * factor;
+        currentY += dy * factor;
+        currentClientX += dcx * factor;
+        currentClientY += dcy * factor;
       }
 
       reveal.style.setProperty('--reveal-x', `${currentX.toFixed(1)}px`);
@@ -72,9 +89,9 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onSelectStation }) => 
         isInside = true;
         reveal.classList.add('is-active');
         hud.classList.add('is-active');
-        if (!rafId) {
-          rafId = requestAnimationFrame(updateLoop);
-        }
+      }
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateLoop);
       }
     };
 
@@ -89,10 +106,12 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onSelectStation }) => 
     };
 
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    container.addEventListener('pointerleave', handlePointerLeave);
     document.addEventListener('mouseleave', handlePointerLeave);
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
+      container.removeEventListener('pointerleave', handlePointerLeave);
       document.removeEventListener('mouseleave', handlePointerLeave);
       if (rafId) {
         cancelAnimationFrame(rafId);
@@ -117,25 +136,27 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onSelectStation }) => 
       }}
       className="frost-texture-overlay"
     >
-      {/* LAYER 1: Dual Moving "DAKSHIN" Typography Marquee (Lowest Layer) */}
-      <div className="landing-watermark-container">
-        {/* Row 1: Right-to-Left drift */}
-        <div className="landing-watermark-row">
-          <div className="landing-watermark-track track-left">
-            <span>DAKSHIN</span>
-            <span>DAKSHIN</span>
-            <span>DAKSHIN</span>
-          </div>
-          <div className="landing-watermark-track track-left" aria-hidden="true">
-            <span>DAKSHIN</span>
-            <span>DAKSHIN</span>
-            <span>DAKSHIN</span>
-          </div>
-        </div>
+      {/* LAYER 1: New Authentic Daytime Bharati Research Station Photographic Background */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: 'url(/images/bharati_station_new.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 40%',
+          opacity: 0.85,
+          filter: 'contrast(105%) brightness(1.02) saturate(1.05)',
+          pointerEvents: 'none',
+          zIndex: 1,
+        }}
+      />
 
-        {/* Row 2: Left-to-Right drift */}
-        <div className="landing-watermark-row" style={{ marginTop: '-4vw' }}>
+      {/* LAYER 2: Moving "DAKSHIN" Typography Marquee (Continuous Left-to-Right Loop) */}
+      <div className="landing-watermark-container">
+        {/* Row 1: Left-to-Right continuous drift */}
+        <div className="landing-watermark-row">
           <div className="landing-watermark-track track-right">
+            <span>DAKSHIN</span>
             <span>DAKSHIN</span>
             <span>DAKSHIN</span>
             <span>DAKSHIN</span>
@@ -144,46 +165,48 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onSelectStation }) => 
             <span>DAKSHIN</span>
             <span>DAKSHIN</span>
             <span>DAKSHIN</span>
+            <span>DAKSHIN</span>
+          </div>
+        </div>
+
+        {/* Row 2: Left-to-Right offset drift */}
+        <div className="landing-watermark-row" style={{ marginTop: '-2vw' }}>
+          <div className="landing-watermark-track track-right-slow">
+            <span>DAKSHIN</span>
+            <span>DAKSHIN</span>
+            <span>DAKSHIN</span>
+            <span>DAKSHIN</span>
+          </div>
+          <div className="landing-watermark-track track-right-slow" aria-hidden="true">
+            <span>DAKSHIN</span>
+            <span>DAKSHIN</span>
+            <span>DAKSHIN</span>
+            <span>DAKSHIN</span>
           </div>
         </div>
       </div>
 
-      {/* LAYER 2: Existing Antarctic Station Photographic Hero Background */}
+      {/* LAYER 3: Soft Mist & Atmospheric Contrast Blending */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: 'url(/images/antarctic_station_hero.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 30%',
-          opacity: 0.22,
-          filter: 'grayscale(20%) contrast(110%)',
-          pointerEvents: 'none',
-          zIndex: 2,
-        }}
-      />
-
-      {/* LAYER 3: Soft Mist & Frosted Radial Gradient Blending */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'radial-gradient(ellipse 90% 70% at 50% 35%, rgba(224, 229, 233, 0.4) 0%, rgba(224, 229, 233, 0.95) 85%, var(--mist-gray) 100%)',
+          background: 'radial-gradient(ellipse 95% 75% at 50% 40%, rgba(224, 229, 233, 0.12) 0%, rgba(224, 229, 233, 0.45) 55%, rgba(224, 229, 233, 0.88) 100%)',
           pointerEvents: 'none',
           zIndex: 3,
         }}
       />
 
-      {/* LAYER 4: Second Antarctic Station Ghost Reveal Layer */}
+      {/* LAYER 4: High-Definition Station Spotlight Reveal Layer */}
       <div
         ref={revealRef}
         className="landing-station-reveal"
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: 'url(/assets/antarctic-station-reveal.jpg)',
+          backgroundImage: 'url(/images/bharati_station_new.jpg)',
           backgroundSize: 'cover',
-          backgroundPosition: 'center 30%',
+          backgroundPosition: 'center 40%',
           pointerEvents: 'none',
           zIndex: 4,
         }}

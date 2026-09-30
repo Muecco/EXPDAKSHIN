@@ -17,16 +17,19 @@ import { useStation } from '../../context/StationContext';
 import { useSimulation } from '../../context/SimulationContext';
 import { getStationDigitalTwinData } from '../../services/digitalTwinData';
 import type { MachineAssetId, MachineTelemetry } from '../../types/digitalTwin';
-import type { WeatherCondition, WeatherState } from '../../types/weather';
+import type { WeatherCondition } from '../../types/weather';
 import type { UserRole } from '../../types/commands';
 import type { OperationalStatus } from '../../types';
 import { getDefaultStationWeather, WEATHER_PRESETS } from '../../services/weatherData';
 import { AntarcticWeatherSystem } from './weatherSystem';
 import { AssetDetailPanel } from './AssetDetailPanel';
-import { RoleSwitcher } from './RoleSwitcher';
+import { TwinViewMenu } from './TwinViewMenu';
 import { BharatiStation } from './bharati/BharatiStation';
 import type { VisionMode, HeatMapMetric, CameraPresetId } from './bharati/types';
 import { HEAT_MAP_CONFIGS } from './bharati/HeatMapController';
+import { MaitriStation } from './maitri/MaitriStation';
+import { getStationLayout } from './station/layouts';
+import type { StationLayout, TwinHandle } from './station/types';
 
 interface DigitalTwinPanelProps {
   onSelectAsset?: (asset: MachineTelemetry) => void;
@@ -71,6 +74,11 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
   );
   const weatherRef = useRef<WeatherCondition>(weather);
   weatherRef.current = weather;
+  /**
+   * When the operator picks a manual weather preset the 3D weather stops
+   * following the simulation until LIVE is re-enabled.
+   */
+  const [weatherOverride, setWeatherOverride] = useState(false);
 
   // Real-time active asset state synced with simulation engine
   const liveActiveAsset = useMemo(() => {
@@ -94,8 +102,28 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
   useEffect(() => {
     if (selectedStation) {
       setWeather(getDefaultStationWeather(selectedStation.id));
+      setWeatherOverride(false);
     }
   }, [selectedStation?.id]);
+
+  // Synchronize 3D digital twin atmospheric state with real-time/simulation telemetry
+  useEffect(() => {
+    if (weatherOverride || !currentAtmospheric) return;
+    setWeather((prev) => ({
+      ...prev,
+      temperature: currentAtmospheric.temperature,
+      windSpeed: currentAtmospheric.wind_speed,
+      weatherState: currentAtmospheric.weather_state,
+      snowIntensity:
+        currentAtmospheric.weather_state === 'BLIZZARD' ? 1.0 :
+        currentAtmospheric.weather_state === 'HEAVY_SNOW' ? 0.75 :
+        currentAtmospheric.weather_state === 'MODERATE_SNOW' ? 0.5 :
+        currentAtmospheric.weather_state === 'LIGHT_SNOW' ? 0.25 : 0.05,
+      fogDensity:
+        currentAtmospheric.weather_state === 'BLIZZARD' ? 0.035 :
+        currentAtmospheric.weather_state === 'HEAVY_SNOW' ? 0.02 : 0.005,
+    }));
+  }, [currentAtmospheric, weatherOverride]);
 
   // Clear selection when station changes
   useEffect(() => {
@@ -116,31 +144,35 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const assetMeshesRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const weatherSystemRef = useRef<AntarcticWeatherSystem | null>(null);
-  const bharatiStationRef = useRef<BharatiStation | null>(null);
+  // Active station twin. MAITRI and BHARATI models are swapped through this one
+  // handle, so no code path can mount a station model in the wrong section.
+  const twinRef = useRef<TwinHandle | null>(null);
+  /** Layout manifest of the active station (null = station keeps its own geometry). */
+  const layoutRef = useRef<StationLayout | null>(null);
 
   // Selection highlight refs
   const selectionRingRef = useRef<THREE.Mesh | null>(null);
   const activeAssetRef = useRef<MachineTelemetry | null>(null);
   activeAssetRef.current = activeAsset;
 
-  // Handle Vision Mode switches
+  // Handle Vision Mode switches (no scene rebuild, station-agnostic)
   useEffect(() => {
-    if (bharatiStationRef.current && stationData) {
-      bharatiStationRef.current.setVisionMode(
+    if (twinRef.current && stationData) {
+      twinRef.current.setVisionMode(
         visionMode,
         heatMapMetric,
         stationData.assets,
         currentAtmospheric
       );
     }
-  }, [visionMode, heatMapMetric, stationData, currentAtmospheric]);
+  }, [visionMode, heatMapMetric, stationData, currentAtmospheric, selectedStation?.id]);
 
   // Real-time reactive mesh status updates from simulation without rebuilding scene
   useEffect(() => {
     if (!machineryAssets) return;
 
-    if (bharatiStationRef.current) {
-      bharatiStationRef.current.updateTelemetry(machineryAssets, currentAtmospheric);
+    if (twinRef.current) {
+      twinRef.current.updateTelemetry(machineryAssets, currentAtmospheric);
     }
 
     if (assetMeshesRef.current) {
@@ -167,8 +199,12 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     }
   }, [machineryAssets, currentAtmospheric]);
 
-  // Real-time reactive weather updates from simulation
+  // Real-time reactive weather updates from the simulation engine.
+  // The telemetry object is mutated in place, so this effect must key on the
+  // atmospheric VALUES: keying on the object reference meant the 3D weather
+  // initialised once and then never followed the simulation again.
   useEffect(() => {
+    if (weatherOverride) return; // manual preset takes precedence
     if (currentAtmospheric) {
       setWeather({
         temperature: currentAtmospheric.temperature,
@@ -186,12 +222,33 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
           currentAtmospheric.weather_state === 'HEAVY_SNOW' ? 4.8 : 20.0,
       });
     }
-  }, [currentAtmospheric]);
+  }, [
+    currentAtmospheric.temperature,
+    currentAtmospheric.wind_speed,
+    currentAtmospheric.wind_direction,
+    currentAtmospheric.wind_direction_cardinal,
+    currentAtmospheric.weather_state,
+    weatherOverride,
+  ]);
 
   const setCameraPreset = (preset: CameraPresetId) => {
     if (!cameraRef.current || !controlsRef.current) return;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
+
+    // Stations that own a layout manifest define their own presets
+    const layoutPreset = layoutRef.current?.cameraPresets[preset];
+    if (layoutPreset) {
+      camera.position.set(
+        layoutPreset.position[0],
+        layoutPreset.position[1],
+        layoutPreset.position[2]
+      );
+      controls.target.set(layoutPreset.target[0], layoutPreset.target[1], layoutPreset.target[2]);
+      controls.update();
+      return;
+    }
+
     switch (preset) {
       case 'aerial':
         camera.position.set(18, 14, 20);
@@ -229,14 +286,20 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
       selectionRingRef.current = null;
     }
 
-    if (bharatiStationRef.current) {
-      bharatiStationRef.current.selectAsset(assetId);
+    if (twinRef.current) {
+      twinRef.current.selectAsset(assetId);
     }
 
     if (!assetId || !stationData) return;
 
     const asset = stationData.assets[assetId as MachineAssetId];
     if (!asset) return;
+
+    // The ring follows the station layout manifest when the active station owns
+    // one (single source of truth); otherwise the asset data position is used.
+    const layoutPosition = layoutRef.current?.assetPositions[assetId as MachineAssetId];
+    const ringX = layoutPosition ? layoutPosition[0] : asset.position[0];
+    const ringZ = layoutPosition ? layoutPosition[2] : asset.position[2];
 
     // Animated selection ring
     const ringGeo = new THREE.RingGeometry(1.4, 1.62, 32);
@@ -249,7 +312,7 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.x = -Math.PI / 2;
-    ring.position.set(asset.position[0], 0.05, asset.position[2]);
+    ring.position.set(ringX, 0.05, ringZ);
     ring.name = '__selectionRing__';
     scene.add(ring);
     selectionRingRef.current = ring;
@@ -263,16 +326,26 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     const width = container.clientWidth;
     const height = compact ? 420 : 580;
 
+    // Station layout manifest — null for stations that keep their own geometry.
+    const layout = getStationLayout(selectedStation.id);
+    layoutRef.current = layout;
+    const skyColor = layout?.environment.skyColor ?? '#C4D4DE';
+
     // 1. Scene
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    scene.background = new THREE.Color('#C4D4DE');
-    scene.fog = new THREE.FogExp2('#C4D4DE', 0.015);
+    scene.background = new THREE.Color(skyColor);
+    scene.fog = new THREE.FogExp2(skyColor, layout?.environment.fogDensity ?? 0.015);
 
-    // 2. Camera
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 140);
-    camera.position.set(18, 14, 20);
-    cameraRef.current = camera;
+    // 2. Camera — opens on the station's own aerial preset
+    const aerialPreset = layout?.cameraPresets.aerial;
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 200);
+    camera.position.set(
+      aerialPreset ? aerialPreset.position[0] : 18,
+      aerialPreset ? aerialPreset.position[1] : 14,
+      aerialPreset ? aerialPreset.position[2] : 20
+    );
+    cameraRef.current = camera;    cameraRef.current = camera;
 
     // 3. Renderer
     const renderer = new THREE.WebGLRenderer({
@@ -292,10 +365,11 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
-    controls.target.set(0, 3.0, 0);
+    const focusTarget = layout?.cameraPresets.aerial.target ?? [0, 3.0, 0];
+    controls.target.set(focusTarget[0], focusTarget[1], focusTarget[2]);
     controls.maxPolarAngle = Math.PI / 2 - 0.02;
-    controls.minDistance = 6;
-    controls.maxDistance = 55;
+    controls.minDistance = layout?.orbit.minDistance ?? 12;
+    controls.maxDistance = layout?.orbit.maxDistance ?? 55;
     controlsRef.current = controls;
 
     // 5. Lighting
@@ -319,10 +393,12 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     scene.add(polarBounceLight);
 
     // 6. Ground & Larsemann Hills Terrain
-    const groundGeo = new THREE.PlaneGeometry(100, 100, 32, 32);
+    // Base terrain plane. Its colour comes from the station environment profile
+    // so the shared plane blends into each station's own site detailing.
+    const groundGeo = new THREE.PlaneGeometry(320, 320, 32, 32);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: '#E0E7EC',
-      roughness: 0.85,
+      color: layout?.environment.groundColor ?? '#E0E7EC',
+      roughness: 0.9,
       metalness: 0.05,
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -331,21 +407,24 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Rocky outcrops characteristic of Larsemann Hills
-    const rockMat = new THREE.MeshStandardMaterial({ color: '#556573', roughness: 0.95 });
-    [
-      [-14, 0.4, -12, 4.5, 0.8, 4.0],
-      [16, 0.6, -14, 5.0, 1.2, 5.0],
-      [-12, 0.5, 14, 4.0, 1.0, 4.5],
-      [15, 0.4, 15, 6.0, 0.9, 5.5],
-    ].forEach(([x, y, z, sx, sy, sz]) => {
-      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), rockMat);
-      rock.scale.set(sx, sy, sz);
-      rock.position.set(x, y, z);
-      rock.castShadow = true;
-      rock.receiveShadow = true;
-      scene.add(rock);
-    });
+    // Rocky outcrops characteristic of the Bharati (Larsemann Hills) coastline.
+    // Stations that build their own site terrain supply this instead.
+    if (!layout) {
+      const rockMat = new THREE.MeshStandardMaterial({ color: '#556573', roughness: 0.95 });
+      [
+        [-14, 0.4, -12, 4.5, 0.8, 4.0],
+        [16, 0.6, -14, 5.0, 1.2, 5.0],
+        [-12, 0.5, 14, 4.0, 1.0, 4.5],
+        [15, 0.4, 15, 6.0, 0.9, 5.5],
+      ].forEach(([x, y, z, sx, sy, sz]) => {
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), rockMat);
+        rock.scale.set(sx, sy, sz);
+        rock.position.set(x, y, z);
+        rock.castShadow = true;
+        rock.receiveShadow = true;
+        scene.add(rock);
+      });
+    }
 
     // Weather System
     const weatherSys = new AntarcticWeatherSystem(scene, ground);
@@ -361,62 +440,20 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
     assetMeshesRef.current.clear();
 
     // 7. Station Architecture Twin
+    //    Exactly one station model is created, and only for the station whose
+    //    section is active. Bharati keeps its dedicated model class; Maitri gets
+    //    its own station-specific model. The two are never interchanged.
     const isBharati = selectedStation.id === 'bharati';
+    const twin: TwinHandle = isBharati ? new BharatiStation() : new MaitriStation();
+    twin.initializeTelemetry(stationData.assets);
+    scene.add(twin.rootGroup);
+    twinRef.current = twin;
 
-    if (isBharati) {
-      // MASTER DIGITAL TWIN: Detailed BHARATI Research Station
-      const bharatiStation = new BharatiStation();
-      bharatiStation.initializeTelemetry(stationData.assets);
-      scene.add(bharatiStation.rootGroup);
-      bharatiStationRef.current = bharatiStation;
-
-      // Register asset meshes for raycast selection
-      bharatiStation.equipment.assetGroups.forEach((group, assetId) => {
+    // Register asset meshes for raycast selection & reactive status colouring
+    const assetGroups = twin.getAssetGroups ? twin.getAssetGroups() : null;
+    if (assetGroups) {
+      assetGroups.forEach((group, assetId) => {
         assetMeshesRef.current.set(assetId, group);
-      });
-    } else {
-      // Fallback for Maitri Station
-      bharatiStationRef.current = null;
-      const stationGroup = new THREE.Group();
-      scene.add(stationGroup);
-
-      const structureMat = new THREE.MeshStandardMaterial({ color: '#004E64', roughness: 0.35, metalness: 0.2 });
-      const trimMat = new THREE.MeshStandardMaterial({ color: '#003645', roughness: 0.4 });
-      const steelStiltMat = new THREE.MeshStandardMaterial({ color: '#4A5B66', roughness: 0.6, metalness: 0.8 });
-
-      const hub = new THREE.Mesh(new THREE.BoxGeometry(7, 2.4, 4.5), structureMat);
-      hub.position.set(0, 1.2, 0);
-      hub.castShadow = true;
-      hub.receiveShadow = true;
-      stationGroup.add(hub);
-
-      const roofTrim = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.2, 4.7), trimMat);
-      roofTrim.position.set(0, 2.45, 0);
-      stationGroup.add(roofTrim);
-
-      const eastWing = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.2, 3.5), structureMat);
-      eastWing.position.set(5.5, 1.1, 0.5);
-      stationGroup.add(eastWing);
-
-      const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.8, 16), steelStiltMat);
-      tunnel.rotation.z = Math.PI / 2;
-      tunnel.position.set(3.4, 1.1, 0.3);
-      stationGroup.add(tunnel);
-
-      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.15, 6, 8), steelStiltMat);
-      mast.position.set(2.5, 5, -1.5);
-      stationGroup.add(mast);
-
-      // Simple asset meshes for fallback
-      Object.values(stationData.assets).forEach((asset) => {
-        const assetGroup = new THREE.Group();
-        assetGroup.name = asset.asset_id;
-        assetGroup.position.set(...asset.position);
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), structureMat);
-        mesh.userData = { assetId: asset.asset_id };
-        assetGroup.add(mesh);
-        scene.add(assetGroup);
-        assetMeshesRef.current.set(asset.asset_id, assetGroup);
       });
     }
 
@@ -514,9 +551,9 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
 
       const time = now * 0.001;
 
-      // Update Bharati Master Twin (pipelines, beacons, pulses)
-      if (bharatiStationRef.current) {
-        bharatiStationRef.current.update(dt, time);
+      // Update the active station twin (pipelines, beacons, pulses)
+      if (twinRef.current) {
+        twinRef.current.update(dt, time);
       }
 
       // Animate selection ring
@@ -551,9 +588,9 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
         selectionRingRef.current = null;
       }
 
-      if (bharatiStationRef.current) {
-        bharatiStationRef.current.dispose();
-        bharatiStationRef.current = null;
+      if (twinRef.current) {
+        twinRef.current.dispose();
+        twinRef.current = null;
       }
 
       if (weatherSystemRef.current) {
@@ -568,6 +605,12 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
   if (!selectedStation || !stationData) return null;
 
   const currentHeatMapConfig = HEAT_MAP_CONFIGS[heatMapMetric];
+  /**
+   * Layout manifest of the active station. Stations that own one drive thermal
+   * intensity from live machine temperature (emission), so the metric picker
+   * and the metric colourbar do not apply to them.
+   */
+  const activeLayout = getStationLayout(selectedStation.id);
 
   return (
     <div
@@ -650,7 +693,9 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
               </span>
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-              Bioclimatic Stilt Elevation • Aerodynamic Envelope • Real-Time Machinery Matrix
+              {activeLayout
+                ? `${activeLayout.utilityRoutes.length} utility routes · ${activeLayout.thermalSources.length} thermal emitters · simulated telemetry`
+                : 'Real-time machinery matrix'}
             </div>
           </div>
         </div>
@@ -704,55 +749,21 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             </span>
           </div>
 
-          {/* Weather Preset Selector */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              padding: '2px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid rgba(0, 78, 100, 0.15)',
+          {/* Consolidated view menu — camera framing, weather presets and the
+              demo role live behind one chip so the viewport header stays clean. */}
+          <TwinViewMenu
+            weatherState={weather.weatherState}
+            weatherOverride={weatherOverride}
+            onWeatherPreset={(stateKey) => {
+              const preset = WEATHER_PRESETS[stateKey];
+              setWeatherOverride(true);
+              setWeather((prev) => ({ ...prev, ...preset, temperature: prev.temperature }));
             }}
-            title="Antarctic Weather Simulation Preset"
-          >
-            {(['CLEAR', 'LIGHT_SNOW', 'MODERATE_SNOW', 'HEAVY_SNOW', 'BLIZZARD'] as WeatherState[]).map(
-              (stateKey) => {
-                const isActive = weather.weatherState === stateKey;
-                const shortLabel =
-                  stateKey === 'CLEAR' ? 'CLEAR' :
-                  stateKey === 'LIGHT_SNOW' ? 'LIGHT' :
-                  stateKey === 'MODERATE_SNOW' ? 'MOD' :
-                  stateKey === 'HEAVY_SNOW' ? 'HEAVY' : 'BLIZZARD';
-
-                return (
-                  <button
-                    key={stateKey}
-                    onClick={() => {
-                      const preset = WEATHER_PRESETS[stateKey];
-                      setWeather((prev) => ({ ...prev, ...preset, temperature: prev.temperature }));
-                    }}
-                    style={{
-                      padding: '0.22rem 0.45rem',
-                      fontSize: '0.65rem',
-                      fontWeight: isActive ? 800 : 600,
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: isActive ? 'var(--deep-teal)' : 'transparent',
-                      color: isActive ? '#FFFFFF' : 'var(--deep-teal)',
-                      cursor: 'pointer',
-                      border: 'none',
-                    }}
-                  >
-                    {shortLabel}
-                  </button>
-                );
-              }
-            )}
-          </div>
-
-          {/* Demo Role Switcher */}
-          <RoleSwitcher currentRole={userRole} onChange={setUserRole} />
+            onWeatherLive={() => setWeatherOverride(false)}
+            onCameraPreset={setCameraPreset}
+            role={userRole}
+            onRoleChange={setUserRole}
+          />
         </div>
       </div>
 
@@ -809,7 +820,7 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             }}
           >
             <Eye size={13} />
-            NORMAL 3D
+            NORMAL
           </button>
 
           <button
@@ -851,7 +862,7 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             }}
           >
             <Network size={13} />
-            PIPELINES &amp; FLOW
+            PIPELINE
           </button>
 
           <button
@@ -872,52 +883,16 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             }}
           >
             <Flame size={13} />
-            HEAT MAP
+            THERMAL
           </button>
         </div>
 
-        {/* Right: Camera Presets */}
-        <div
-          style={{
-            pointerEvents: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            backgroundColor: 'rgba(255, 255, 255, 0.92)',
-            backdropFilter: 'blur(8px)',
-            padding: '0.3rem',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid rgba(0, 78, 100, 0.15)',
-            boxShadow: '0 4px 14px rgba(0, 78, 100, 0.08)',
-          }}
-        >
-          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--deep-teal)', padding: '0 0.35rem' }}>
-            VIEW:
-          </span>
-          {(['aerial', 'front', 'side', 'infra', 'plan'] as CameraPresetId[]).map((preset) => (
-            <button
-              key={preset}
-              onClick={() => setCameraPreset(preset)}
-              style={{
-                padding: '0.3rem 0.55rem',
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                borderRadius: 'var(--radius-sm)',
-                color: 'var(--deep-teal)',
-                cursor: 'pointer',
-                border: 'none',
-                background: 'transparent',
-              }}
-              title={`Switch camera to ${preset} view`}
-            >
-              {preset.toUpperCase()}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* ── HEAT MAP METRIC SUB-SELECTOR (Rendered when in HEAT_MAP mode) ───── */}
-      {visionMode === 'HEAT_MAP' && (
+      {/* ── METRIC SUB-SELECTOR — only for stations still using metric tinting.
+             Emission-based thermal stations derive intensity from live machine
+             telemetry, so no metric picker applies to them. ─────────────────── */}
+      {visionMode === 'HEAT_MAP' && !activeLayout && (
         <div
           style={{
             position: 'absolute',
@@ -968,7 +943,7 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
         </div>
       )}
 
-      {/* ── PIPELINE CONNECTIVITY HELPER CHIP ───────────────────────────────── */}
+      {/* ── PIPELINE CONNECTIVITY LEGEND & HELPER BAR ────────────────────────── */}
       {visionMode === 'CONNECTIVITY' && (
         <div
           style={{
@@ -978,20 +953,60 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             zIndex: 15,
             display: 'flex',
             alignItems: 'center',
+            flexWrap: 'wrap',
             gap: '0.5rem',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(8px)',
-            padding: '0.4rem 0.85rem',
-            borderRadius: 'var(--radius-full)',
+            backgroundColor: 'rgba(255, 255, 255, 0.96)',
+            backdropFilter: 'blur(10px)',
+            padding: '0.35rem 0.75rem',
+            borderRadius: 'var(--radius-md)',
             border: '1px solid rgba(217, 119, 6, 0.3)',
-            fontSize: '0.72rem',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+            fontSize: '0.68rem',
             fontWeight: 700,
-            color: '#B45309',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
           }}
         >
-          <Network size={14} />
-          <span>Interactive Connectivity: Click any equipment in the 3D twin to highlight connected pipelines &amp; telemetry flow.</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#B45309', marginRight: '0.2rem' }}>
+            <Network size={13} />
+            <span>LEGEND:</span>
+          </div>
+
+          {[
+            { label: 'HEATING WATER', color: '#EF4444' },
+            { label: 'POTABLE WATER', color: '#3B82F6' },
+            { label: 'WASTEWATER', color: '#10B981' },
+            { label: 'FUEL', color: '#EAB308' },
+            { label: 'AIR / HVAC', color: '#06B6D4' },
+            { label: 'ELECTRICAL', color: '#F97316' },
+          ].map((item) => (
+            <span
+              key={item.label}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                color: 'var(--slate-800)',
+                backgroundColor: 'rgba(241, 245, 249, 0.95)',
+                padding: '0.15rem 0.45rem',
+                borderRadius: 'var(--radius-sm)',
+                border: `1px solid ${item.color}55`,
+              }}
+            >
+              <span
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: item.color,
+                  boxShadow: `0 0 4px ${item.color}`,
+                }}
+              />
+              {item.label}
+            </span>
+          ))}
+
+          <span style={{ color: 'var(--text-secondary)', marginLeft: '0.25rem', fontSize: '0.65rem' }}>
+            · Click machine to isolate
+          </span>
         </div>
       )}
 
@@ -1052,8 +1067,9 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
           </div>
         )}
 
-        {/* Floating Heat Map Colorbar Legend (Rendered when in HEAT_MAP mode) */}
-        {visionMode === 'HEAT_MAP' && (
+        {/* Floating metric colourbar — emission-based thermal stations use the
+            thermal radiation field itself as the visual legend. */}
+        {visionMode === 'HEAT_MAP' && !activeLayout && (
           <div
             style={{
               position: 'absolute',
@@ -1159,7 +1175,7 @@ export const DigitalTwinPanel: React.FC<DigitalTwinPanelProps> = ({
             gap: '0.35rem',
           }}
         >
-          <RotateCcw size={12} /> Left-Click Drag: Rotate | Scroll: Zoom | Right-Click: Pan | Click machine/sensor to inspect
+          <RotateCcw size={12} /> Drag to orbit · scroll to zoom · click machinery to inspect
         </div>
 
         {/* Station Health */}
